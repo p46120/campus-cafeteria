@@ -2,16 +2,13 @@ import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
 from google.cloud.firestore_v1 import transactional
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 import requests
-import json
 import base64
-import io
-from PIL import Image
-
+import uuid
 
 # ============================================================
-# PAGE CONFIG
+# CONFIG
 # ============================================================
 
 st.set_page_config(
@@ -21,24 +18,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-
-# ============================================================
-# APP CONFIG
-# ============================================================
-
 CAFETERIA_NAME = "Campus Cafeteria"
 
+# Cafeteria portal credentials requested by the user
 CAFETERIA_LOGIN_ID = "cafeteria"
 CAFETERIA_PASSWORD = "Campus@123"
 
+# Cafeteria desk contact
 DESK_NAME = "Rahul"
 DESK_PHONE = "9065334992"
 DESK_EMAIL = "rahulraj1244raj@gmail.com"
-
-
-# ============================================================
-# BREAK OPTIONS
-# ============================================================
 
 BREAK_OPTIONS = [
     "10:30 AM – 11:00 AM",
@@ -51,82 +40,15 @@ BREAK_OPTIONS = [
     "9:30 PM – 10:00 PM",
 ]
 
-
-# ============================================================
-# DEFAULT MENU
-# ============================================================
-
 DEFAULT_MENU = [
-    {
-        "name": "Veg Roll",
-        "price": 40,
-        "available": True,
-        "discount": 0,
-        "popular": True,
-        "image": "",
-    },
-    {
-        "name": "Maggi",
-        "price": 35,
-        "available": True,
-        "discount": 0,
-        "popular": True,
-        "image": "",
-    },
-    {
-        "name": "Sandwich",
-        "price": 50,
-        "available": True,
-        "discount": 0,
-        "popular": True,
-        "image": "",
-    },
-    {
-        "name": "Samosa",
-        "price": 15,
-        "available": True,
-        "discount": 0,
-        "popular": False,
-        "image": "",
-    },
-    {
-        "name": "Tea",
-        "price": 20,
-        "available": True,
-        "discount": 0,
-        "popular": True,
-        "image": "",
-    },
-    {
-        "name": "Cold Coffee",
-        "price": 30,
-        "available": True,
-        "discount": 0,
-        "popular": False,
-        "image": "",
-    },
+    {"name": "Veg Roll", "price": 40, "available": True, "discount": 0, "popular": True},
+    {"name": "Maggi", "price": 40, "available": True, "discount": 0, "popular": True},
+    {"name": "Sandwich", "price": 50, "available": True, "discount": 0, "popular": True},
+    {"name": "Samosa", "price": 15, "available": True, "discount": 0, "popular": False},
+    {"name": "Tea", "price": 20, "available": True, "discount": 0, "popular": True},
+    {"name": "Coffee", "price": 30, "available": True, "discount": 0, "popular": False},
+    {"name": "Cold Drink", "price": 30, "available": True, "discount": 0, "popular": False},
 ]
-
-
-# ============================================================
-# LEGACY MENU NAME FIX
-# ============================================================
-#
-# These are the random Firestore IDs visible in your screenshot.
-# They will no longer be displayed as food names.
-#
-# If a document already has a "name" field, that real name
-# always takes priority.
-#
-# ============================================================
-
-LEGACY_MENU_NAME_MAP = {
-    "4u3FCDLEIKKmeQcLXdnW": "Veg Roll",
-    "Ulp0Yd6IZvOYMRxUeRof": "Maggi",
-    "0z3xzZZH7Yajbkpa03fb": "Tea",
-    "pI7CfsYLvEocPU1n2RTx": "Sandwich",
-}
-
 
 # ============================================================
 # CSS
@@ -135,123 +57,113 @@ LEGACY_MENU_NAME_MAP = {
 st.markdown(
     """
 <style>
+    .stApp {
+        background: #f7f8fc;
+    }
 
-.stApp {
-    background: #f7f8fc;
-}
+    .hero {
+        padding: 2.2rem 2rem;
+        border-radius: 24px;
+        background: linear-gradient(135deg, #fff7ed 0%, #ffffff 55%, #eff6ff 100%);
+        border: 1px solid #e5e7eb;
+        margin-bottom: 1.2rem;
+    }
 
-.block-container {
-    max-width: 1200px;
-    padding-top: 1.5rem;
-    padding-bottom: 3rem;
-}
+    .hero h1 {
+        font-size: 2.7rem;
+        margin: 0;
+        color: #111827;
+    }
 
-.hero {
-    background: linear-gradient(
-        135deg,
-        #fff7ed 0%,
-        #ffffff 50%,
-        #eff6ff 100%
-    );
+    .hero p {
+        font-size: 1.08rem;
+        color: #4b5563;
+        margin-top: .6rem;
+    }
 
-    border: 1px solid #e5e7eb;
-    border-radius: 24px;
-    padding: 2.4rem 2.6rem;
-    margin: 1rem 0 2rem 0;
+    .section-title {
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: #111827;
+        margin: 1.2rem 0 .7rem;
+    }
 
-    box-shadow:
-        0 8px 30px rgba(15, 23, 42, 0.06);
-}
+    .card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 18px;
+        padding: 1.15rem;
+        height: 100%;
+        box-shadow: 0 2px 8px rgba(0,0,0,.035);
+    }
 
-.hero h1 {
-    font-size: 2.5rem;
-    line-height: 1.15;
-    color: #111827;
-    margin: 0 0 .8rem 0;
-}
+    .card h3 {
+        margin: 0 0 .4rem;
+        color: #111827;
+    }
 
-.hero p {
-    font-size: 1.05rem;
-    color: #6b7280;
-    margin: 0;
-}
+    .card p {
+        color: #6b7280;
+        margin: 0;
+    }
 
-.card {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 18px;
-    padding: 1.35rem;
-    min-height: 125px;
+    .small-muted {
+        color: #6b7280;
+        font-size: .9rem;
+    }
 
-    box-shadow:
-        0 3px 12px rgba(15, 23, 42, 0.04);
-}
+    .order-id {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #111827;
+        text-align: center;
+    }
 
-.card h3 {
-    color: #111827;
-    margin-top: 0;
-    margin-bottom: .55rem;
-}
+    .success-box {
+        padding: 1.2rem;
+        border-radius: 18px;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        margin: .8rem 0;
+    }
 
-.card p {
-    color: #6b7280;
-    line-height: 1.55;
-    margin: 0;
-}
+    .warning-box {
+        padding: 1rem;
+        border-radius: 16px;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+    }
 
-.success-box {
-    background: #ecfdf5;
-    border: 1px solid #a7f3d0;
-    border-radius: 18px;
-    padding: 1.1rem 1.3rem;
-    margin-bottom: 1rem;
-}
+    .login-box {
+        max-width: 560px;
+        margin: 1rem auto;
+        padding: 1.5rem;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 22px;
+        box-shadow: 0 5px 20px rgba(0,0,0,.05);
+    }
 
-.login-box {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 20px;
-    padding: 1.4rem;
-    margin-bottom: 1rem;
-}
+    div[data-testid="stMetric"] {
+        background: white;
+        border: 1px solid #e5e7eb;
+        padding: 12px;
+        border-radius: 16px;
+    }
 
-div[data-testid="stMetric"] {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 16px;
-    padding: 12px;
-}
+    button[kind="primary"] {
+        border-radius: 12px;
+    }
 
-.stButton > button {
-    border-radius: 12px;
-    min-height: 42px;
-    font-weight: 600;
-}
-
-[data-testid="stHeader"] {
-    background: transparent;
-}
-
+    .nav-label {
+        font-weight: 700;
+        color: #374151;
+        margin-bottom: .35rem;
+    }
 </style>
 """,
     unsafe_allow_html=True,
 )
-
-
-# ============================================================
-# HTML HELPER
-# ============================================================
-
-def render_html(html):
-
-    if hasattr(st, "html"):
-        st.html(html)
-    else:
-        st.markdown(
-            html,
-            unsafe_allow_html=True,
-        )
-
 
 # ============================================================
 # FIREBASE
@@ -259,169 +171,61 @@ def render_html(html):
 
 @st.cache_resource
 def init_firebase():
-
     if not firebase_admin._apps:
-
-        firebase_json = st.secrets.get(
-            "firebase_json"
-        )
-
+        firebase_json = st.secrets.get("firebase_json")
         if not firebase_json:
-            raise RuntimeError(
-                "firebase_json is missing from Streamlit Secrets."
-            )
+            raise RuntimeError("firebase_json is missing from Streamlit Secrets.")
 
-        if isinstance(
-            firebase_json,
-            str,
-        ):
-            firebase_json = json.loads(
-                firebase_json
-            )
+        if isinstance(firebase_json, str):
+            import json
+            firebase_json = json.loads(firebase_json)
 
-        cred = credentials.Certificate(
-            firebase_json
-        )
-
-        firebase_admin.initialize_app(
-            cred
-        )
+        cred = credentials.Certificate(firebase_json)
+        firebase_admin.initialize_app(cred)
 
     return firestore.client()
 
 
 try:
-
     db = init_firebase()
-
     firebase_connected = True
-    firebase_error = ""
-
 except Exception as e:
-
     db = None
     firebase_connected = False
     firebase_error = str(e)
 
 
-# ============================================================
-# FIREBASE WEB API KEY
-# ============================================================
-
 def get_web_api_key():
-
-    return st.secrets.get(
-        "firebase_web_api_key",
-        "",
-    )
+    return st.secrets.get("firebase_web_api_key", "")
 
 
 # ============================================================
-# IMAGE CONVERSION
+# FIREBASE AUTH REST HELPERS
 # ============================================================
 
-def image_to_data_url(
-    uploaded_file,
-    max_size=700,
-    quality=75,
-):
-
-    if uploaded_file is None:
-        return ""
-
-    try:
-
-        image = Image.open(
-            uploaded_file
-        ).convert("RGB")
-
-        image.thumbnail(
-            (
-                max_size,
-                max_size,
-            )
-        )
-
-        buffer = io.BytesIO()
-
-        image.save(
-            buffer,
-            format="JPEG",
-            quality=quality,
-            optimize=True,
-        )
-
-        encoded = base64.b64encode(
-            buffer.getvalue()
-        ).decode("utf-8")
-
-        return (
-            "data:image/jpeg;base64,"
-            + encoded
-        )
-
-    except Exception:
-
-        return ""
-
-
-# ============================================================
-# FIREBASE AUTH
-# ============================================================
-
-def auth_request(
-    endpoint,
-    payload,
-):
-
+def auth_request(endpoint, payload):
     api_key = get_web_api_key()
 
     if not api_key:
+        return None, "Firebase Web API Key is missing from Streamlit Secrets."
 
-        return (
-            None,
-            "Firebase Web API Key is missing from Streamlit Secrets.",
-        )
-
-    url = (
-        "https://identitytoolkit.googleapis.com/v1/"
-        f"{endpoint}?key={api_key}"
-    )
+    url = f"https://identitytoolkit.googleapis.com/v1/{endpoint}?key={api_key}"
 
     try:
-
-        response = requests.post(
-            url,
-            json=payload,
-            timeout=20,
-        )
-
+        response = requests.post(url, json=payload, timeout=20)
         data = response.json()
 
         if response.ok:
             return data, None
 
-        message = (
-            data
-            .get("error", {})
-            .get(
-                "message",
-                "Authentication failed.",
-            )
-        )
-
+        message = data.get("error", {}).get("message", "Authentication failed.")
         return None, message
 
     except Exception as e:
-
         return None, str(e)
 
 
-def signup_student(
-    email,
-    password,
-):
-
+def signup_student(email, password):
     return auth_request(
         "accounts:signUp",
         {
@@ -432,11 +236,7 @@ def signup_student(
     )
 
 
-def login_student(
-    email,
-    password,
-):
-
+def login_student(email, password):
     return auth_request(
         "accounts:signInWithPassword",
         {
@@ -447,10 +247,7 @@ def login_student(
     )
 
 
-def send_password_reset(
-    email,
-):
-
+def send_password_reset(email):
     return auth_request(
         "accounts:sendOobCode",
         {
@@ -460,26 +257,15 @@ def send_password_reset(
     )
 
 
-def refresh_id_token(
-    refresh_token,
-):
-
+def refresh_id_token(refresh_token):
     api_key = get_web_api_key()
 
     if not api_key:
+        return None, "Firebase Web API Key is missing."
 
-        return (
-            None,
-            "Firebase Web API Key is missing.",
-        )
-
-    url = (
-        "https://securetoken.googleapis.com/v1/token"
-        f"?key={api_key}"
-    )
+    url = f"https://securetoken.googleapis.com/v1/token?key={api_key}"
 
     try:
-
         response = requests.post(
             url,
             data={
@@ -494,98 +280,50 @@ def refresh_id_token(
         if response.ok:
             return data, None
 
-        return (
-            None,
-            data
-            .get("error", {})
-            .get(
-                "message",
-                "Could not refresh session.",
-            ),
+        return None, data.get(
+            "error", {}
+        ).get(
+            "message",
+            "Could not refresh session."
         )
 
     except Exception as e:
-
         return None, str(e)
 
 
 def get_logged_in_uid():
-
-    session = st.session_state.get(
-        "auth_session"
-    )
+    session = st.session_state.get("auth_session")
 
     if not session:
         return None
 
     try:
+        # Refresh before the ID token becomes stale.
+        login_time = session.get("login_time", 0)
 
-        login_time = session.get(
-            "login_time",
-            0,
-        )
-
-        if (
-            datetime.now().timestamp()
-            - login_time
-            > 3000
-        ):
-
-            refreshed, error = (
-                refresh_id_token(
-                    session[
-                        "refresh_token"
-                    ]
-                )
+        if datetime.now().timestamp() - login_time > 3000:
+            refreshed, error = refresh_id_token(
+                session["refresh_token"]
             )
 
             if error:
-
-                st.session_state.pop(
-                    "auth_session",
-                    None,
-                )
-
+                st.session_state.pop("auth_session", None)
+                st.session_state.pop("student_user", None)
                 return None
 
-            session[
-                "id_token"
-            ] = refreshed[
-                "id_token"
-            ]
+            session["id_token"] = refreshed["id_token"]
+            session["refresh_token"] = refreshed["refresh_token"]
+            session["login_time"] = datetime.now().timestamp()
 
-            session[
-                "refresh_token"
-            ] = refreshed[
-                "refresh_token"
-            ]
+            st.session_state.auth_session = session
 
-            session[
-                "login_time"
-            ] = datetime.now().timestamp()
-
-            st.session_state[
-                "auth_session"
-            ] = session
-
-        decoded = auth.verify_id_token(
-            session["id_token"]
-        )
+        decoded = auth.verify_id_token(session["id_token"])
 
         return decoded["uid"]
 
     except Exception:
-
-        st.session_state.pop(
-            "auth_session",
-            None,
-        )
-
-        st.session_state.pop(
-            "student_user",
-            None,
-        )
-
+        st.session_state.pop("auth_session", None)
+        st.session_state.pop("student_user", None)
         return None
 
 
@@ -594,51 +332,34 @@ def get_logged_in_uid():
 # ============================================================
 
 def get_user_profile(uid):
+    if not db:
+        return None
 
-    snap = (
-        db.collection("users")
-        .document(uid)
-        .get()
-    )
+    snap = db.collection("users").document(uid).get()
 
-    if snap.exists:
-        return snap.to_dict()
-
-    return None
+    return snap.to_dict() if snap.exists else None
 
 
-def save_user_profile(
-    uid,
-    name,
-    student_id,
-    email,
-):
-
-    db.collection(
-        "users"
-    ).document(uid).set(
+def save_user_profile(uid, name, student_id, email):
+    db.collection("users").document(uid).set(
         {
             "name": name,
             "student_id": student_id,
             "email": email,
             "wallet_balance": 0,
-            "created_at":
-                firestore.SERVER_TIMESTAMP,
+            "created_at": firestore.SERVER_TIMESTAMP,
         },
         merge=True,
     )
 
 
 def current_student():
-
     uid = get_logged_in_uid()
 
     if not uid:
         return None
 
-    profile = get_user_profile(
-        uid
-    )
+    profile = get_user_profile(uid)
 
     if not profile:
         return None
@@ -653,136 +374,44 @@ def current_student():
 # ============================================================
 
 def load_menu():
+    if not db:
+        return DEFAULT_MENU
 
     docs = list(
-        db.collection("menu")
-        .stream()
+        db.collection("menu").stream()
     )
 
-    # If no menu exists, create the standard menu.
     if not docs:
-
         for item in DEFAULT_MENU:
-
-            db.collection(
-                "menu"
-            ).document(
+            db.collection("menu").document(
                 item["name"]
             ).set(item)
 
-        return DEFAULT_MENU.copy()
+        return DEFAULT_MENU
 
     menu = []
 
     for doc in docs:
-
         item = doc.to_dict()
-
-        # ----------------------------------------------------
-        # IMPORTANT FIX
-        # ----------------------------------------------------
-        #
-        # 1. If "name" exists, use it.
-        # 2. If old document has no name, check the known
-        #    legacy ID map.
-        # 3. Never display a random Firestore ID to students.
-        #
-        # ----------------------------------------------------
-
-        stored_name = str(
-            item.get(
-                "name",
-                ""
-            )
-        ).strip()
-
-        if stored_name:
-
-            food_name = stored_name
-
-        elif doc.id in LEGACY_MENU_NAME_MAP:
-
-            food_name = LEGACY_MENU_NAME_MAP[
-                doc.id
-            ]
-
-            # Save the real name into Firestore
-            # so the correction remains permanent.
-            doc.reference.set(
-                {
-                    "name": food_name
-                },
-                merge=True,
-            )
-
-        else:
-
-            # For any other old unnamed document,
-            # don't expose the technical Firestore ID.
-            food_name = "Food Item"
-
-        item["name"] = food_name
-
-        item.setdefault(
-            "price",
-            0,
-        )
-
-        item.setdefault(
-            "available",
-            True,
-        )
-
-        item.setdefault(
-            "discount",
-            0,
-        )
-
-        item.setdefault(
-            "popular",
-            False,
-        )
-
-        item.setdefault(
-            "image",
-            "",
-        )
-
-        # Keep actual Firestore reference internally.
-        item["_doc_id"] = doc.id
-
+        item["name"] = doc.id
         menu.append(item)
 
     return sorted(
         menu,
-        key=lambda x:
-            x["name"].lower(),
+        key=lambda x: x["name"]
     )
 
 
 def effective_price(item):
+    price = float(item.get("price", 0))
+    discount = float(item.get("discount", 0))
 
-    price = float(
-        item.get(
-            "price",
-            0,
+    return max(
+        0,
+        round(
+            price * (1 - discount / 100),
+            2
         )
-    )
-
-    discount = float(
-        item.get(
-            "discount",
-            0,
-        )
-    )
-
-    return round(
-        price
-        * (
-            1
-            - discount / 100
-        ),
-        2,
     )
 
 
@@ -791,111 +420,54 @@ def save_menu_item(
     price,
     discount,
     available,
-    popular,
-    image="",
+    popular
 ):
-
-    name = name.strip()
-
-    data = {
-        "name": name,
-        "price": float(price),
-        "discount": float(discount),
-        "available": bool(available),
-        "popular": bool(popular),
-    }
-
-    if image:
-        data["image"] = image
-
-    # New food items now use the actual food name
-    # as the Firestore document ID.
-    db.collection(
-        "menu"
-    ).document(
-        name
-    ).set(
-        data,
+    db.collection("menu").document(name).set(
+        {
+            "price": float(price),
+            "discount": float(discount),
+            "available": bool(available),
+            "popular": bool(popular),
+        },
         merge=True,
     )
 
 
-def delete_menu_item(
-    item,
-):
-
-    # Prefer the real stored document ID.
-    doc_id = item.get(
-        "_doc_id"
-    )
-
-    if doc_id:
-
-        db.collection(
-            "menu"
-        ).document(
-            doc_id
-        ).delete()
-
-        return
-
-    name = item.get(
-        "name",
-        "",
-    )
-
-    if name:
-
-        db.collection(
-            "menu"
-        ).document(
-            name
-        ).delete()
+def delete_menu_item(name):
+    db.collection("menu").document(name).delete()
 
 
 # ============================================================
-# ORDER ID
+# ORDER ID - DAILY SEQUENTIAL COUNTER
 # ============================================================
 
 def generate_daily_order_id():
-
     today = date.today().isoformat()
 
-    counter_ref = (
-        db.collection("counters")
-        .document(today)
-    )
+    ref = db.collection("counters").document(today)
 
     transaction = db.transaction()
 
     @transactional
-    def increment_counter(
-        transaction,
-        counter_ref,
-    ):
-
-        snapshot = counter_ref.get(
+    def increment_counter(transaction, ref):
+        snapshot = ref.get(
             transaction=transaction
         )
 
         if snapshot.exists:
-
             current = int(
-                snapshot.to_dict()
-                .get(
+                snapshot.to_dict().get(
                     "value",
-                    0,
+                    0
                 )
             )
-
         else:
-
             current = 0
 
         new_value = current + 1
 
         transaction.set(
-            counter_ref,
+            ref,
             {
                 "value": new_value
             },
@@ -906,7 +478,7 @@ def generate_daily_order_id():
 
     number = increment_counter(
         transaction,
-        counter_ref,
+        ref
     )
 
     return f"{number:03d}"
@@ -916,171 +488,99 @@ def generate_daily_order_id():
 # ORDER HELPERS
 # ============================================================
 
-def normalize_order_items(
-    items,
-):
-
-    if isinstance(
-        items,
-        dict,
-    ):
-
-        result = []
-
-        for name, quantity in items.items():
-
-            result.append(
-                {
-                    "name": name,
-                    "quantity": int(
-                        quantity
-                    ),
-                    "unit_price": 0,
-                    "line_total": 0,
-                }
-            )
-
-        return result
-
-    if isinstance(
-        items,
-        list,
-    ):
-
-        return items
-
-    return []
-
-
-def order_items_text(
-    order,
-):
-
-    items = normalize_order_items(
-        order.get(
-            "items",
-            [],
-        )
-    )
-
-    if not items:
-
-        return "No items"
-
-    return ", ".join(
-        f"{item.get('name', 'Item')} × "
-        f"{item.get('quantity', 0)}"
-        for item in items
-    )
-
-
-# ============================================================
-# FIND ORDER DOCUMENT
-# ============================================================
-
-def find_order_document(
-    order,
-):
-
+def find_order_document(order):
     order_id = str(
-        order.get(
-            "order_id",
-            "",
-        )
+        order.get("order_id")
     )
 
-    order_date = order.get(
+    today = order.get(
         "date",
-        date.today().isoformat(),
+        date.today().isoformat()
     )
 
-    new_ref = (
-        db.collection("orders")
-        .document(
-            f"{order_date}_{order_id}"
-        )
+    ref = db.collection(
+        "orders"
+    ).document(
+        f"{today}_{order_id}"
     )
 
-    if new_ref.get().exists:
+    snap = ref.get()
 
-        return new_ref
+    if snap.exists:
+        return ref
 
     query = (
         db.collection("orders")
         .where(
             "order_id",
             "==",
-            order_id,
+            order_id
+        )
+        .where(
+            "date",
+            "==",
+            today
         )
         .limit(1)
         .stream()
     )
 
     for doc in query:
+        return doc.reference
 
+    query = (
+        db.collection("orders")
+        .where(
+            "order_id",
+            "==",
+            order_id
+        )
+        .limit(1)
+        .stream()
+    )
+
+    for doc in query:
         return doc.reference
 
     return None
 
 
-def update_order_status(
-    order,
-    status,
-):
-
-    ref = find_order_document(
-        order
-    )
+def update_order_status(order, new_status):
+    ref = find_order_document(order)
 
     if not ref:
-
-        return (
-            False,
-            "Order document not found.",
-        )
+        return False, "Order document not found."
 
     ref.update(
         {
-            "status": status,
-            "updated_at":
-                firestore.SERVER_TIMESTAMP,
+            "status": new_status,
+            "updated_at": firestore.SERVER_TIMESTAMP,
         }
     )
 
     return True, None
 
 
-def mark_payment_received(
-    order,
-):
-
-    ref = find_order_document(
-        order
-    )
+def mark_counter_payment_received(order):
+    ref = find_order_document(order)
 
     if not ref:
-
-        return (
-            False,
-            "Order document not found.",
-        )
+        return False, "Order document not found."
 
     ref.update(
         {
             "payment_status": "Paid",
-            "payment_received_at":
-                firestore.SERVER_TIMESTAMP,
+            "payment_method": "Pay at Counter",
+            "payment_received_at": firestore.SERVER_TIMESTAMP,
         }
     )
 
     return True, None
 
 
-# ============================================================
-# ORDERS
-# ============================================================
-
 def get_today_orders():
+    if not db:
+        return []
 
     today = date.today().isoformat()
 
@@ -1089,7 +589,7 @@ def get_today_orders():
         .where(
             "date",
             "==",
-            today,
+            today
         )
         .stream()
     )
@@ -1099,39 +599,35 @@ def get_today_orders():
         for doc in docs
     ]
 
-    def order_number(order):
-
+    def order_sort(x):
         try:
-
             return int(
                 str(
-                    order.get(
+                    x.get(
                         "order_id",
-                        "0",
+                        "0"
                     )
                 )
             )
-
         except Exception:
-
             return 0
 
     return sorted(
         orders,
-        key=order_number,
+        key=order_sort
     )
 
 
-def get_student_orders(
-    uid,
-):
+def get_student_orders(uid):
+    if not db:
+        return []
 
     docs = (
         db.collection("orders")
         .where(
             "uid",
             "==",
-            uid,
+            uid
         )
         .stream()
     )
@@ -1141,32 +637,11 @@ def get_student_orders(
         for doc in docs
     ]
 
-    def order_number(order):
-
-        try:
-
-            return int(
-                str(
-                    order.get(
-                        "order_id",
-                        "0",
-                    )
-                )
-            )
-
-        except Exception:
-
-            return 0
-
     return sorted(
         orders,
-        key=lambda x: (
-            x.get(
-                "date",
-                "",
-            ),
-            order_number(x),
-        ),
+        key=lambda x: x.get(
+            "created_at"
+        ) or "",
         reverse=True,
     )
 
@@ -1175,20 +650,15 @@ def get_student_orders(
 # WALLET
 # ============================================================
 
-def credit_wallet(
+def add_wallet_money(
     uid,
     amount,
-    reason,
+    reason="Wallet top-up"
 ):
-
     amount = float(amount)
 
     if amount <= 0:
-
-        return (
-            False,
-            "Amount must be greater than zero.",
-        )
+        return False, "Amount must be greater than zero."
 
     transaction = db.transaction()
 
@@ -1197,194 +667,95 @@ def credit_wallet(
         .document(uid)
     )
 
-    wallet_transaction_ref = (
-        db.collection(
-            "wallet_transactions"
-        ).document()
+    wallet_tx_ref = (
+        db.collection("wallet_transactions")
+        .document()
     )
 
     @transactional
-    def credit(
+    def credit_wallet(
         transaction,
         user_ref,
-        wallet_transaction_ref,
+        wallet_tx_ref
     ):
-
-        snapshot = user_ref.get(
+        snap = user_ref.get(
             transaction=transaction
         )
 
-        if snapshot.exists:
-
-            balance = float(
-                snapshot.to_dict()
-                .get(
+        current = (
+            float(
+                snap.to_dict().get(
                     "wallet_balance",
-                    0,
+                    0
                 )
             )
-
-        else:
-
-            balance = 0
+            if snap.exists
+            else 0
+        )
 
         new_balance = round(
-            balance + amount,
-            2,
+            current + amount,
+            2
         )
 
         transaction.set(
             user_ref,
             {
-                "wallet_balance":
-                    new_balance
+                "wallet_balance": new_balance
             },
             merge=True,
         )
 
         transaction.set(
-            wallet_transaction_ref,
+            wallet_tx_ref,
             {
                 "uid": uid,
                 "type": "Credit",
                 "amount": amount,
-                "balance_after":
-                    new_balance,
+                "balance_after": new_balance,
                 "reason": reason,
-                "created_at":
-                    firestore.SERVER_TIMESTAMP,
-                "date":
-                    date.today().isoformat(),
+                "created_at": firestore.SERVER_TIMESTAMP,
+                "date": date.today().isoformat(),
             },
         )
 
         return new_balance
 
-    try:
-
-        new_balance = credit(
-            transaction,
-            user_ref,
-            wallet_transaction_ref,
-        )
-
-        return True, new_balance
-
-    except Exception as e:
-
-        return False, str(e)
-
-
-def debit_wallet(
-    transaction,
-    uid,
-    amount,
-    order_id,
-):
-
-    user_ref = (
-        db.collection("users")
-        .document(uid)
-    )
-
-    snapshot = user_ref.get(
-        transaction=transaction
-    )
-
-    if not snapshot.exists:
-
-        raise ValueError(
-            "Student profile not found."
-        )
-
-    balance = float(
-        snapshot.to_dict()
-        .get(
-            "wallet_balance",
-            0,
-        )
-    )
-
-    if balance < amount:
-
-        raise ValueError(
-            f"Insufficient wallet balance. "
-            f"Available ₹{balance:.2f}."
-        )
-
-    new_balance = round(
-        balance - amount,
-        2,
-    )
-
-    transaction.update(
+    balance = credit_wallet(
+        transaction,
         user_ref,
-        {
-            "wallet_balance":
-                new_balance
-        },
+        wallet_tx_ref
     )
 
-    wallet_ref = (
-        db.collection(
-            "wallet_transactions"
-        ).document()
-    )
+    return True, balance
 
-    transaction.set(
-        wallet_ref,
-        {
-            "uid": uid,
-            "type": "Debit",
-            "amount": amount,
-            "balance_after":
-                new_balance,
-            "reason":
-                f"Order #{order_id}",
-            "order_id":
-                order_id,
-            "created_at":
-                firestore.SERVER_TIMESTAMP,
-            "date":
-                date.today().isoformat(),
-        },
-    )
-
-    return new_balance
-
-
-# ============================================================
-# CREATE ORDER
-# ============================================================
 
 def create_order(
     student,
     cart,
     order_type,
     break_time,
-    payment_method,
+    payment_method
 ):
-
     if not cart:
-
-        return (
-            False,
-            "Your cart is empty.",
-        )
+        return False, "Your cart is empty."
 
     uid = student["uid"]
 
-    menu = {
-        item["name"]: item
-        for item in load_menu()
-    }
+    today = date.today().isoformat()
+
+    order_id = generate_daily_order_id()
 
     items = []
+
     total = 0
 
-    for name, quantity in cart.items():
+    menu = {
+        x["name"]: x
+        for x in load_menu()
+    }
 
-        quantity = int(quantity)
+    for name, quantity in cart.items():
 
         if quantity <= 0:
             continue
@@ -1392,29 +763,21 @@ def create_order(
         item = menu.get(name)
 
         if not item:
-
-            return (
-                False,
-                f"{name} is not available.",
-            )
+            return False, f"{name} is no longer available."
 
         if not item.get(
             "available",
-            True,
+            True
         ):
-
-            return (
-                False,
-                f"{name} is currently unavailable.",
+            return False, (
+                f"{name} is currently unavailable."
             )
 
-        price = effective_price(
-            item
-        )
+        price = effective_price(item)
 
         line_total = round(
             price * quantity,
-            2,
+            2
         )
 
         items.append(
@@ -1428,14 +791,7 @@ def create_order(
 
         total += line_total
 
-    total = round(
-        total,
-        2,
-    )
-
-    order_id = generate_daily_order_id()
-
-    today = date.today().isoformat()
+    total = round(total, 2)
 
     order_ref = (
         db.collection("orders")
@@ -1452,187 +808,125 @@ def create_order(
     transaction = db.transaction()
 
     @transactional
-    def save_order(
+    def create_order_transaction(
         transaction,
+        order_ref,
+        user_ref
     ):
-
-        user_snapshot = user_ref.get(
+        user_snap = user_ref.get(
             transaction=transaction
         )
 
-        if not user_snapshot.exists:
-
+        if not user_snap.exists:
             raise ValueError(
                 "Student profile not found."
             )
 
+        user_data = user_snap.to_dict()
+
         if payment_method == "Wallet":
 
-            debit_wallet(
-                transaction,
-                uid,
-                total,
-                order_id,
+            balance = float(
+                user_data.get(
+                    "wallet_balance",
+                    0
+                )
+            )
+
+            if balance < total:
+                raise ValueError(
+                    "Insufficient wallet balance. "
+                    f"Available ₹{balance:.2f}."
+                )
+
+            new_balance = round(
+                balance - total,
+                2
+            )
+
+            transaction.update(
+                user_ref,
+                {
+                    "wallet_balance": new_balance
+                },
+            )
+
+            wallet_tx_ref = (
+                db.collection(
+                    "wallet_transactions"
+                ).document()
+            )
+
+            transaction.set(
+                wallet_tx_ref,
+                {
+                    "uid": uid,
+                    "type": "Debit",
+                    "amount": total,
+                    "balance_after": new_balance,
+                    "reason": f"Order #{order_id}",
+                    "order_id": order_id,
+                    "created_at": firestore.SERVER_TIMESTAMP,
+                    "date": today,
+                },
             )
 
             payment_status = "Paid"
 
         else:
-
             payment_status = "Pending"
 
         order_data = {
-            "order_id":
-                order_id,
-            "uid":
-                uid,
-            "student_name":
-                student.get(
-                    "name",
-                    "",
-                ),
-            "student_id":
-                student.get(
-                    "student_id",
-                    "",
-                ),
-            "email":
-                student.get(
-                    "email",
-                    "",
-                ),
-            "items":
-                items,
-            "total":
-                total,
-            "order_type":
-                order_type,
-            "break_time":
-                break_time,
-            "payment_method":
-                payment_method,
-            "payment_status":
-                payment_status,
-            "status":
-                "Confirmed",
-            "date":
-                today,
-            "created_at":
-                firestore.SERVER_TIMESTAMP,
+            "order_id": order_id,
+            "uid": uid,
+            "student_name": student.get(
+                "name",
+                ""
+            ),
+            "student_id": student.get(
+                "student_id",
+                ""
+            ),
+            "email": student.get(
+                "email",
+                ""
+            ),
+            "items": items,
+            "total": total,
+            "order_type": order_type,
+            "break_time": break_time,
+            "payment_method": payment_method,
+            "payment_status": payment_status,
+            "status": "Confirmed",
+            "date": today,
+            "created_at": firestore.SERVER_TIMESTAMP,
         }
 
         transaction.set(
             order_ref,
-            order_data,
+            order_data
         )
 
         return order_data
 
     try:
-
-        result = save_order(
-            transaction
+        final_order = create_order_transaction(
+            transaction,
+            order_ref,
+            user_ref,
         )
 
-        return True, result
+        return True, final_order
 
     except Exception as e:
-
         return False, str(e)
 
 
 # ============================================================
-# CLEANUP
+# SESSION / NAVIGATION
 # ============================================================
 
-def cleanup_old_records(
-    days=14,
-):
-
-    cutoff = (
-        date.today()
-        - timedelta(
-            days=days
-        )
-    )
-
-    orders_removed = 0
-    feedback_removed = 0
-
-    for doc in (
-        db.collection(
-            "orders"
-        ).stream()
-    ):
-
-        data = doc.to_dict()
-
-        record_date = data.get(
-            "date",
-            "",
-        )
-
-        try:
-
-            if (
-                record_date
-                and date.fromisoformat(
-                    record_date
-                )
-                < cutoff
-            ):
-
-                doc.reference.delete()
-
-                orders_removed += 1
-
-        except Exception:
-
-            pass
-
-    for doc in (
-        db.collection(
-            "feedback"
-        ).stream()
-    ):
-
-        data = doc.to_dict()
-
-        record_date = data.get(
-            "date",
-            "",
-        )
-
-        try:
-
-            if (
-                record_date
-                and date.fromisoformat(
-                    record_date
-                )
-                < cutoff
-            ):
-
-                doc.reference.delete()
-
-                feedback_removed += 1
-
-        except Exception:
-
-            pass
-
-    return (
-        orders_removed,
-        feedback_removed,
-    )
-
-
-# ============================================================
-# SESSION STATE
-# ============================================================
-
-def initialize_session():
-
+def init_state():
     defaults = {
         "page": "Home",
         "cart": {},
@@ -1641,85 +935,65 @@ def initialize_session():
     }
 
     for key, value in defaults.items():
-
         if key not in st.session_state:
-
-            st.session_state[
-                key
-            ] = value
-
-
-initialize_session()
+            st.session_state[key] = value
 
 
 def go_to(page):
-
-    st.session_state[
-        "page"
-    ] = page
-
+    st.session_state.page = page
     st.rerun()
 
 
 def logout_student():
-
     st.session_state.pop(
         "auth_session",
-        None,
+        None
     )
 
     st.session_state.pop(
         "student_user",
-        None,
+        None
     )
 
-    st.session_state[
-        "cart"
-    ] = {}
+    st.session_state.page = "Home"
 
-    st.session_state[
-        "page"
-    ] = "Home"
+    st.session_state.cart = {}
 
     st.rerun()
 
 
+init_state()
+
+student = current_student()
+
+if student:
+    st.session_state.student_user = student
+
+
 # ============================================================
-# NAVIGATION
+# TOP NAVIGATION
 # ============================================================
 
-def render_navigation():
-
-    student = current_student()
-
-    cafeteria_logged_in = (
-        st.session_state.get(
-            "cafeteria_logged_in",
-            False,
-        )
+def render_nav():
+    logged_in = (
+        current_student()
+        is not None
     )
 
-    render_html(
-        """
-<div style="
-    padding:0.2rem 0 0.8rem 0;
-">
-    <div style="
-        font-size:1.8rem;
-        font-weight:800;
-        color:#111827;
-    ">
-        🍽️ Campus Cafeteria
-    </div>
-</div>
-"""
+    cafeteria = st.session_state.get(
+        "cafeteria_logged_in",
+        False
     )
 
-    if student:
+    st.markdown(
+        "### 🍽️ Campus Cafeteria"
+    )
+
+    if logged_in:
 
         cols = st.columns(6)
 
-        buttons = [
+        labels = [
             ("🏠 Home", "Home"),
             ("🍔 Order Food", "Order Food"),
             ("📦 My Orders", "My Orders"),
@@ -1730,7 +1004,7 @@ def render_navigation():
 
         for col, (label, page) in zip(
             cols,
-            buttons,
+            labels
         ):
 
             with col:
@@ -1738,51 +1012,41 @@ def render_navigation():
                 if st.button(
                     label,
                     use_container_width=True,
-                    key=f"nav_student_{page}",
+                    key=f"nav_{page}"
                 ):
 
                     if page == "Logout":
-
                         logout_student()
 
                     else:
-
                         go_to(page)
 
-    elif cafeteria_logged_in:
+    elif cafeteria:
 
-        cols = st.columns(6)
+        cols = st.columns(4)
 
-        buttons = [
+        labels = [
             (
                 "📊 Dashboard",
-                "Cafeteria Dashboard",
+                "Cafeteria Dashboard"
             ),
             (
                 "🍔 Menu",
-                "Menu Management",
-            ),
-            (
-                "💰 Wallet",
-                "Wallet Management",
+                "Menu Management"
             ),
             (
                 "💬 Feedback",
-                "Feedback Management",
-            ),
-            (
-                "🧹 Cleanup",
-                "Cleanup",
+                "Feedback Management"
             ),
             (
                 "🚪 Logout",
-                "Cafeteria Logout",
+                "Cafeteria Logout"
             ),
         ]
 
         for col, (label, page) in zip(
             cols,
-            buttons,
+            labels
         ):
 
             with col:
@@ -1790,34 +1054,34 @@ def render_navigation():
                 if st.button(
                     label,
                     use_container_width=True,
-                    key=f"nav_caf_{page}",
+                    key=f"cnav_{page}"
                 ):
 
                     if page == "Cafeteria Logout":
 
-                        st.session_state[
-                            "cafeteria_logged_in"
-                        ] = False
+                        st.session_state.cafeteria_logged_in = False
 
                         go_to("Home")
 
                     else:
-
                         go_to(page)
 
     else:
 
         cols = st.columns(3)
 
-        buttons = [
-            ("🏠 Home", "Home"),
-            ("🎓 Student Login", "Student Login"),
-            ("🧑‍🍳 Cafeteria Portal", "Cafeteria Portal"),
-        ]
-
-        for col, (label, page) in zip(
+        for col, label, page in zip(
             cols,
-            buttons,
+            [
+                "🏠 Home",
+                "🎓 Student Login",
+                "🧑‍🍳 Cafeteria Portal"
+            ],
+            [
+                "Home",
+                "Student Login",
+                "Cafeteria Portal"
+            ],
         ):
 
             with col:
@@ -1825,9 +1089,8 @@ def render_navigation():
                 if st.button(
                     label,
                     use_container_width=True,
-                    key=f"nav_guest_{page}",
+                    key=f"guest_{page}"
                 ):
-
                     go_to(page)
 
     st.divider()
@@ -1841,20 +1104,17 @@ def home_page():
 
     student = current_student()
 
-    render_html(
+    st.markdown(
         """
-<div class="hero">
-    <h1>
-        Pre-order. Skip the queue.
-        Enjoy your break. 🍽️
-    </h1>
-
-    <p>
-        Order from Campus Cafeteria before
-        the rush and collect your food quickly.
-    </p>
-</div>
-"""
+        <div class="hero">
+            <h1>Pre-order. Skip the queue. Enjoy your break. 🍽️</h1>
+            <p>
+                Order from Campus Cafeteria before the rush and collect your food
+                quickly during your break.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     if student:
@@ -1862,22 +1122,18 @@ def home_page():
         balance = float(
             student.get(
                 "wallet_balance",
-                0,
+                0
             )
         )
 
-        render_html(
+        st.markdown(
             f"""
-<div class="success-box">
-    <b>
-        Welcome back,
-        {student.get("name", "Student")}!
-    </b>
-    <br>
-    Wallet / Coupon Balance:
-    <b>₹{balance:.2f}</b>
-</div>
-"""
+            <div class="success-box">
+                <b>Welcome back, {student.get("name", "Student")}!</b><br>
+                Wallet balance: <b>₹{balance:.2f}</b>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
         c1, c2, c3 = st.columns(3)
@@ -1886,171 +1142,159 @@ def home_page():
 
             if st.button(
                 "🍔 Order Food",
-                type="primary",
                 use_container_width=True,
+                type="primary"
             ):
-
-                go_to(
-                    "Order Food"
-                )
+                go_to("Order Food")
 
         with c2:
 
             if st.button(
-                "📦 Track Orders",
-                use_container_width=True,
+                "📦 Track My Orders",
+                use_container_width=True
             ):
-
-                go_to(
-                    "My Orders"
-                )
+                go_to("My Orders")
 
         with c3:
 
             if st.button(
-                "💰 Wallet / Coupon",
-                use_container_width=True,
+                "💰 Wallet",
+                use_container_width=True
             ):
-
-                go_to(
-                    "Wallet"
-                )
+                go_to("Wallet")
 
     else:
+
+        c1, c2, c3 = st.columns(3)
 
         cards = [
             (
                 "🍔 Order Food",
-                "Pre-order your food before the rush.",
+                "Pre-order your meal and avoid the queue.",
+                "Student Login"
             ),
             (
                 "⏱️ Save Break Time",
-                "Collect quickly instead of standing in the queue.",
+                "Place your order before the cafeteria rush.",
+                "Student Login"
             ),
             (
                 "💳 Easy Payment",
-                "Use your prepaid coupon or pay at counter.",
+                "Use your prepaid wallet or pay at the counter.",
+                "Student Login"
             ),
         ]
 
-        cols = st.columns(3)
+        for col, (title, text, page) in zip(
+            [c1, c2, c3],
+            cards
+        ):
 
-        for i, (
-            title,
-            description,
-        ) in enumerate(cards):
+            with col:
 
-            with cols[i]:
-
-                render_html(
+                st.markdown(
                     f"""
-<div class="card">
-    <h3>{title}</h3>
-    <p>{description}</p>
-</div>
-"""
+                    <div class="card">
+                        <h3>{title}</h3>
+                        <p>{text}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
 
                 if st.button(
                     "Get Started",
                     use_container_width=True,
-                    key=f"get_started_{i}",
+                    key=f"home_{title}"
                 ):
-
-                    go_to(
-                        "Student Login"
-                    )
+                    go_to(page)
 
     st.markdown(
-        "## How it works"
+        '<div class="section-title">How it works</div>',
+        unsafe_allow_html=True
     )
+
+    cols = st.columns(4)
 
     steps = [
         (
             "1",
             "Login",
-            "Create your student account.",
+            "Create your student account."
         ),
         (
             "2",
             "Order",
-            "Choose Break or Regular Order.",
+            "Choose food and payment method."
         ),
         (
             "3",
-            "Pay",
-            "Use wallet/coupon or pay at counter.",
+            "Prepare",
+            "Cafeteria confirms your order."
         ),
         (
             "4",
             "Collect",
-            "Show your Order ID at the desk.",
+            "Show your Order ID at the desk."
         ),
     ]
 
-    cols = st.columns(4)
+    for col, (number, title, text) in zip(
+        cols,
+        steps
+    ):
 
-    for i, (
-        number,
-        title,
-        description,
-    ) in enumerate(steps):
+        with col:
 
-        with cols[i]:
-
-            render_html(
+            st.markdown(
                 f"""
-<div class="card">
-    <h3>{number}. {title}</h3>
-    <p>{description}</p>
-</div>
-"""
+                <div class="card">
+                    <h3>{number}. {title}</h3>
+                    <p>{text}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
     st.markdown(
-        "## Order modes"
+        '<div class="section-title">Order modes</div>',
+        unsafe_allow_html=True
     )
 
     c1, c2 = st.columns(2)
 
     with c1:
 
-        render_html(
+        st.markdown(
             """
-<div class="card">
-    <h3>🕐 Break Order</h3>
-    <p>
-        Pre-order for a selected break period.
-        <br><br>
-        Status:
-        <b>Confirmed → Collected</b>
-    </p>
-</div>
-"""
+            <div class="card">
+                <h3>🕐 Break Order</h3>
+                <p>
+                    Select one of the scheduled break periods and place your order
+                    in advance. Once confirmed, collect it during the selected break.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
     with c2:
 
-        render_html(
+        st.markdown(
             """
-<div class="card">
-    <h3>🏠 Regular Order</h3>
-    <p>
-        Room / Hostel pre-order, available
-        anytime including during breaks.
-        <br><br>
-        Estimated preparation:
-        <b>10–15 minutes</b>
-    </p>
-</div>
-"""
+            <div class="card">
+                <h3>🏠 Regular Order</h3>
+                <p>
+                    For Room / Hostel pre-orders. Available anytime, including
+                    during a break. Estimated preparation time: 10–15 minutes.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
-    st.write("")
-
     st.info(
-        f"Need help at the cafeteria desk? "
-        f"Contact {DESK_NAME} at "
+        f"Need help at the cafeteria desk? Contact {DESK_NAME} at "
         f"{DESK_PHONE} or {DESK_EMAIL}."
     )
 
@@ -2061,64 +1305,65 @@ def home_page():
 
 def student_login_page():
 
-    st.markdown(
-        "## 🎓 Student Login"
-    )
+    st.markdown("## 🎓 Student Login")
 
     if current_student():
 
         st.success(
-            "You are already logged in."
+            f"You are logged in as "
+            f"{current_student().get('name', 'Student')}."
         )
 
         if st.button(
-            "Go to Home"
+            "Go to Student Home",
+            type="primary"
         ):
-
-            go_to(
-                "Home"
-            )
+            go_to("Home")
 
         return
 
-    login_tab, signup_tab, reset_tab = st.tabs(
+    tab_login, tab_signup, tab_reset = st.tabs(
         [
             "Login",
             "Create Account",
-            "Forgot Password",
+            "Forgot Password"
         ]
     )
 
-    with login_tab:
+    with tab_login:
+
+        st.markdown(
+            "### Login to your account"
+        )
 
         email = st.text_input(
-            "Email",
-            key="student_login_email",
+            "College / Student Email",
+            key="login_email"
         )
 
         password = st.text_input(
             "Password",
             type="password",
-            key="student_login_password",
+            key="login_password"
         )
 
         if st.button(
             "Login",
             type="primary",
-            use_container_width=True,
+            use_container_width=True
         ):
 
             if not email or not password:
 
                 st.error(
-                    "Please enter email and password."
+                    "Please enter both email and password."
                 )
 
             else:
 
                 data, error = login_student(
                     email.strip(),
-                    password,
+                    password
                 )
 
                 if error:
@@ -2129,73 +1374,68 @@ def student_login_page():
 
                 else:
 
-                    st.session_state[
-                        "auth_session"
-                    ] = {
-                        "id_token":
-                            data["idToken"],
-                        "refresh_token":
-                            data["refreshToken"],
-                        "login_time":
-                            datetime.now().timestamp(),
+                    uid = data["localId"]
+
+                    st.session_state.auth_session = {
+                        "id_token": data["idToken"],
+                        "refresh_token": data["refreshToken"],
+                        "login_time": datetime.now().timestamp(),
                     }
 
-                    profile = get_user_profile(
-                        data["localId"]
-                    )
+                    profile = get_user_profile(uid)
 
-                    if profile:
+                    if not profile:
 
-                        st.session_state[
-                            "student_user"
-                        ] = profile
-
-                        st.session_state[
-                            "page"
-                        ] = "Home"
-
-                        st.rerun()
+                        st.warning(
+                            "Login succeeded, but your student profile was not found. "
+                            "Please create your account again or contact the desk."
+                        )
 
                     else:
 
-                        st.error(
-                            "Authentication worked, "
-                            "but student profile was not found."
-                        )
+                        st.session_state.student_user = profile
 
-    with signup_tab:
+                        st.session_state.page = "Home"
+
+                        st.rerun()
+
+    with tab_signup:
+
+        st.markdown(
+            "### Create your student account"
+        )
 
         name = st.text_input(
             "Full Name",
-            key="signup_name",
+            key="signup_name"
         )
 
         student_id = st.text_input(
             "Student ID / Roll Number",
-            key="signup_student_id",
+            key="signup_student_id"
         )
 
         email = st.text_input(
             "Email",
-            key="signup_email",
+            key="signup_email"
         )
 
         password = st.text_input(
             "Create Password",
             type="password",
-            key="signup_password",
+            key="signup_password"
         )
 
-        confirm_password = st.text_input(
+        confirm = st.text_input(
             "Confirm Password",
             type="password",
-            key="signup_confirm",
+            key="signup_confirm"
         )
 
         if st.button(
             "Create Account",
             type="primary",
-            use_container_width=True,
+            use_container_width=True
         ):
 
             if not all(
@@ -2204,7 +1444,7 @@ def student_login_page():
                     student_id,
                     email,
                     password,
-                    confirm_password,
+                    confirm
                 ]
             ):
 
@@ -2212,7 +1452,7 @@ def student_login_page():
                     "Please fill all fields."
                 )
 
-            elif password != confirm_password:
+            elif password != confirm:
 
                 st.error(
                     "Passwords do not match."
@@ -2228,21 +1468,18 @@ def student_login_page():
 
                 data, error = signup_student(
                     email.strip(),
-                    password,
+                    password
                 )
 
                 if error:
 
                     st.error(
-                        f"Could not create account: "
-                        f"{error}"
+                        f"Could not create account: {error}"
                     )
 
                 else:
 
-                    uid = data[
-                        "localId"
-                    ]
+                    uid = data["localId"]
 
                     save_user_profile(
                         uid,
@@ -2251,39 +1488,44 @@ def student_login_page():
                         email.strip(),
                     )
 
-                    st.session_state[
-                        "auth_session"
-                    ] = {
-                        "id_token":
-                            data["idToken"],
-                        "refresh_token":
-                            data["refreshToken"],
-                        "login_time":
-                            datetime.now().timestamp(),
+                    st.session_state.auth_session = {
+                        "id_token": data["idToken"],
+                        "refresh_token": data["refreshToken"],
+                        "login_time": datetime.now().timestamp(),
                     }
 
-                    st.session_state[
-                        "page"
-                    ] = "Home"
+                    st.session_state.student_user = (
+                        get_user_profile(uid)
+                    )
+
+                    st.session_state.page = "Home"
+
+                    st.success(
+                        "Account created successfully!"
+                    )
 
                     st.rerun()
 
-    with reset_tab:
+    with tab_reset:
+
+        st.markdown(
+            "### Reset your password"
+        )
 
         email = st.text_input(
-            "Account Email",
-            key="reset_email",
+            "Enter your account email",
+            key="reset_email"
         )
 
         if st.button(
             "Send Reset Email",
-            use_container_width=True,
+            use_container_width=True
         ):
 
             if not email:
 
                 st.error(
-                    "Enter your email."
+                    "Enter your email first."
                 )
 
             else:
@@ -2295,14 +1537,13 @@ def student_login_page():
                 if error:
 
                     st.error(
-                        f"Could not send reset email: "
-                        f"{error}"
+                        f"Could not send reset email: {error}"
                     )
 
                 else:
 
                     st.success(
-                        "Password reset email sent."
+                        "Password reset email sent. Check your inbox."
                     )
 
 
@@ -2323,10 +1564,7 @@ def order_food_page():
         if st.button(
             "Go to Student Login"
         ):
-
-            go_to(
-                "Student Login"
-            )
+            go_to("Student Login")
 
         return
 
@@ -2337,11 +1575,11 @@ def order_food_page():
     menu = load_menu()
 
     available_items = [
-        item
-        for item in menu
-        if item.get(
+        x
+        for x in menu
+        if x.get(
             "available",
-            True,
+            True
         )
     ]
 
@@ -2353,354 +1591,258 @@ def order_food_page():
 
         return
 
-    # ========================================================
-    # POPULAR PICKS
-    # ========================================================
-
-    popular_items = [
-        item
-        for item in available_items
-        if item.get(
+    popular = [
+        x
+        for x in available_items
+        if x.get(
             "popular",
-            False,
+            False
         )
     ]
 
-    if popular_items:
+    if popular:
 
         st.markdown(
-            "## ⭐ Popular Picks"
+            "### ⭐ Popular Picks"
         )
 
         cols = st.columns(
             min(
                 3,
-                len(popular_items),
+                len(popular)
             )
         )
 
         for col, item in zip(
             cols,
-            popular_items[:3],
+            popular[:3]
         ):
 
             with col:
 
-                with st.container(
-                    border=True
-                ):
-
-                    if item.get(
-                        "image"
-                    ):
-
-                        st.image(
-                            item["image"],
-                            use_container_width=True,
-                        )
-
-                    st.markdown(
-                        f"### {item['name']}"
-                    )
-
-                    st.write(
-                        f"₹{effective_price(item):.0f}"
-                    )
-
-    # ========================================================
-    # MENU
-    # ========================================================
+                st.markdown(
+                    f"""
+                    <div class="card">
+                        <h3>{item['name']}</h3>
+                        <p>₹{effective_price(item):.0f}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
     st.markdown(
-        "## Menu"
+        "### Menu"
     )
 
-    cols = st.columns(2)
+    # ONLY CHANGE FOR THE DUPLICATE-KEY FIX:
+    # enumerate gives every quantity widget a unique key.
+    for item_index, item in enumerate(available_items):
 
-    for i, item in enumerate(
-        available_items
-    ):
+        name = item["name"]
 
-        with cols[
-            i % 2
-        ]:
+        price = effective_price(item)
 
-            with st.container(
-                border=True
-            ):
+        c1, c2, c3 = st.columns(
+            [4, 1, 1]
+        )
 
-                if item.get(
-                    "image"
-                ):
+        with c1:
 
-                    st.image(
-                        item["image"],
-                        use_container_width=True,
-                    )
+            discount = float(
+                item.get(
+                    "discount",
+                    0
+                )
+            )
 
-                st.markdown(
-                    f"### {item['name']}"
+            if discount > 0:
+
+                st.write(
+                    f"**{name}** — "
+                    f"~~₹{item['price']}~~ "
+                    f"₹{price:.0f}"
                 )
 
-                price = effective_price(
-                    item
+            else:
+
+                st.write(
+                    f"**{name}** — "
+                    f"₹{price:.0f}"
                 )
 
-                old_price = float(
-                    item.get(
-                        "price",
-                        price,
-                    )
+        with c2:
+
+            current = st.session_state.cart.get(
+                name,
+                0
+            )
+
+            qty = st.number_input(
+                "Qty",
+                min_value=0,
+                max_value=20,
+                value=int(current),
+                step=1,
+
+                # FIXED ONLY THIS KEY:
+                key=f"qty_{item_index}",
+            )
+
+            if qty == 0:
+
+                st.session_state.cart.pop(
+                    name,
+                    None
                 )
 
-                discount = float(
-                    item.get(
-                        "discount",
-                        0,
-                    )
-                )
+            else:
 
-                if discount > 0:
+                st.session_state.cart[name] = int(qty)
 
-                    st.markdown(
-                        f"~~₹{old_price:.0f}~~ "
-                        f"**₹{price:.0f}**"
-                    )
+        with c3:
 
-                    st.caption(
-                        f"{discount:.0f}% discount"
-                    )
-
-                else:
-
-                    st.markdown(
-                        f"**₹{price:.0f}**"
-                    )
-
-                current_quantity = int(
-                    st.session_state[
-                        "cart"
-                    ].get(
-                        item["name"],
-                        0,
-                    )
-                )
-
-                quantity = st.number_input(
-                    "Quantity",
-                    min_value=0,
-                    max_value=20,
-                    value=current_quantity,
-                    step=1,
-                    key=f"qty_{item['name']}",
-                )
-
-                if quantity > 0:
-
-                    st.session_state[
-                        "cart"
-                    ][
-                        item["name"]
-                    ] = int(quantity)
-
-                else:
-
-                    st.session_state[
-                        "cart"
-                    ].pop(
-                        item["name"],
-                        None,
-                    )
-
-    # ========================================================
-    # CART
-    # ========================================================
+            st.write("")
 
     st.divider()
 
-    cart = st.session_state[
-        "cart"
-    ]
+    cart = st.session_state.cart
 
     if not cart:
 
         st.info(
-            "Your cart is empty."
+            "Your cart is empty. Select quantities above."
         )
 
         return
 
     menu_map = {
-        item["name"]: item
-        for item in menu
+        x["name"]: x
+        for x in menu
     }
 
     total = 0
 
     st.markdown(
-        "## 🛒 Your Cart"
+        "### 🛒 Your Cart"
     )
 
-    for name, quantity in cart.items():
+    for name, qty in cart.items():
 
-        item = menu_map.get(
-            name
-        )
+        item = menu_map.get(name)
 
         if item:
 
-            line_total = (
+            line = (
                 effective_price(item)
-                * quantity
+                * qty
             )
 
-            total += line_total
+            total += line
 
             st.write(
-                f"**{name}** × {quantity} "
-                f"= ₹{line_total:.0f}"
+                f"**{name}** × {qty} = "
+                f"₹{line:.0f}"
             )
 
     total = round(
         total,
-        2,
+        2
     )
 
     st.markdown(
-        f"## Total: ₹{total:.0f}"
+        f"### Total: ₹{total:.0f}"
     )
 
-    # ========================================================
-    # ORDER TYPE
-    # ========================================================
-
-    st.markdown(
-        "## Choose Order Type"
-    )
-
-    order_type = st.radio(
+    order_mode = st.radio(
         "Order Type",
         [
             "Break Order",
-            "Regular Order",
+            "Regular Order"
         ],
         horizontal=True,
-        key="order_type",
     )
 
     break_time = None
 
-    if order_type == "Break Order":
+    if order_mode == "Break Order":
 
-        st.success(
-            "Select your collection break."
+        st.caption(
+            "Choose the break period when you will collect your order."
         )
 
         break_time = st.selectbox(
-            "Break Period",
-            BREAK_OPTIONS,
-            key="break_time",
+            "Break Time",
+            BREAK_OPTIONS
         )
 
     else:
 
         st.info(
-            "Regular Order is for Room / Hostel "
-            "pre-order. It is available anytime, "
-            "including during breaks. "
+            "Regular orders are for Room / Hostel pre-order only. "
             "Estimated preparation time: 10–15 minutes."
         )
 
-    # ========================================================
-    # PAYMENT
-    # ========================================================
-
-    st.markdown(
-        "## 💳 Payment"
+    payment_method = st.radio(
+        "Payment Method",
+        [
+            "Wallet",
+            "Pay at Counter"
+        ],
+        horizontal=True,
     )
 
     wallet_balance = float(
         student.get(
             "wallet_balance",
-            0,
+            0
         )
     )
 
-    payment_choice = st.radio(
-        "Payment Method",
-        [
-            "Prepaid Wallet / Coupon",
-            "Pay at Counter",
-        ],
-        horizontal=True,
-        key="payment_choice",
-    )
+    if payment_method == "Wallet":
 
-    if (
-        payment_choice
-        == "Prepaid Wallet / Coupon"
-    ):
-
-        st.metric(
-            "Wallet Balance",
-            f"₹{wallet_balance:.2f}",
+        st.caption(
+            f"Wallet balance: ₹{wallet_balance:.2f}"
         )
 
         if wallet_balance < total:
 
             st.warning(
-                f"Insufficient balance. "
-                f"You need "
-                f"₹{total - wallet_balance:.2f} more."
+                "Insufficient wallet balance. "
+                f"You need ₹{total - wallet_balance:.2f} more."
             )
 
     else:
 
-        st.info(
-            "Pay at the cafeteria desk when "
-            "collecting your order."
+        st.caption(
+            "Pay the cafeteria desk when you collect your order."
         )
 
-    # ========================================================
-    # PLACE ORDER
-    # ========================================================
-
     if st.button(
-        "🛒 Place Order",
+        "Place Order",
         type="primary",
-        use_container_width=True,
+        use_container_width=True
     ):
 
         if (
-            payment_choice
-            == "Prepaid Wallet / Coupon"
+            payment_method == "Wallet"
+            and wallet_balance < total
         ):
 
-            if wallet_balance < total:
-
-                st.error(
-                    "Insufficient wallet balance."
-                )
-
-                return
-
-            payment_method = "Wallet"
-
-        else:
-
-            payment_method = (
-                "Pay at Counter"
+            st.error(
+                "Insufficient wallet balance."
             )
 
-        success, result = create_order(
+            return
+
+        ok, result = create_order(
             student,
             cart,
-            order_type,
+            order_mode,
             break_time,
             payment_method,
         )
 
-        if not success:
+        if not ok:
 
             st.error(
                 f"Could not place order: {result}"
@@ -2708,17 +1850,13 @@ def order_food_page():
 
             return
 
-        st.session_state[
-            "last_order"
-        ] = result
+        st.session_state.last_order = result
 
-        st.session_state[
-            "cart"
-        ] = {}
+        st.session_state.cart = {}
 
-        st.session_state[
-            "page"
-        ] = "Order Confirmation"
+        st.session_state.page = (
+            "Order Confirmation"
+        )
 
         st.rerun()
 
@@ -2739,42 +1877,28 @@ def confirmation_page():
             "No recent order."
         )
 
+        if st.button(
+            "Order Food"
+        ):
+            go_to("Order Food")
+
         return
 
     st.markdown(
         "## ✅ Order Confirmed"
     )
 
-    render_html(
+    st.markdown(
         f"""
-<div class="success-box"
-     style="text-align:center;">
-
-    <div style="
-        color:#6b7280;
-        font-size:.95rem;
-    ">
-        Your Order ID
-    </div>
-
-    <div style="
-        font-size:2.7rem;
-        font-weight:800;
-        color:#111827;
-        margin:.3rem 0;
-    ">
-        #{order.get("order_id")}
-    </div>
-
-    <div style="
-        color:#6b7280;
-    ">
-        Show this Order ID at the
-        cafeteria desk.
-    </div>
-
-</div>
-"""
+        <div class="success-box">
+            <div class="small-muted">Your Order ID</div>
+            <div class="order-id">#{order['order_id']}</div>
+            <p style="text-align:center">
+                Show this Order ID at the cafeteria desk when collecting.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     st.write(
@@ -2782,9 +1906,7 @@ def confirmation_page():
         f"{order.get('order_type', '-')}"
     )
 
-    if order.get(
-        "break_time"
-    ):
+    if order.get("break_time"):
 
         st.write(
             f"**Break:** "
@@ -2792,13 +1914,18 @@ def confirmation_page():
         )
 
     st.write(
-        f"**Payment Method:** "
+        f"**Payment:** "
         f"{order.get('payment_method', '-')}"
     )
 
     st.write(
         f"**Payment Status:** "
         f"{order.get('payment_status', '-')}"
+    )
+
+    st.write(
+        f"**Status:** "
+        f"{order.get('status', 'Confirmed')}"
     )
 
     st.write(
@@ -2810,28 +1937,23 @@ def confirmation_page():
         "### Items"
     )
 
-    for item in normalize_order_items(
-        order.get(
-            "items",
-            [],
-        )
+    for item in order.get(
+        "items",
+        []
     ):
 
         st.write(
-            f"{item.get('name', 'Item')} × "
-            f"{item.get('quantity', 0)}"
+            f"{item['name']} × "
+            f"{item['quantity']} — "
+            f"₹{item['line_total']:.0f}"
         )
 
-    if (
-        order.get(
-            "payment_method"
-        )
-        == "Pay at Counter"
-    ):
+    if order.get(
+        "payment_method"
+    ) == "Pay at Counter":
 
         st.warning(
-            "Please pay at the cafeteria desk "
-            "before collecting your order."
+            "Please pay at the cafeteria desk before collection."
         )
 
     c1, c2 = st.columns(2)
@@ -2840,23 +1962,17 @@ def confirmation_page():
 
         if st.button(
             "📦 Track Order",
-            use_container_width=True,
+            use_container_width=True
         ):
-
-            go_to(
-                "My Orders"
-            )
+            go_to("My Orders")
 
     with c2:
 
         if st.button(
             "🍔 Order More",
-            use_container_width=True,
+            use_container_width=True
         ):
-
-            go_to(
-                "Order Food"
-            )
+            go_to("Order Food")
 
 
 # ============================================================
@@ -2889,22 +2005,30 @@ def my_orders_page():
             "You have no orders yet."
         )
 
+        if st.button(
+            "Order Food"
+        ):
+            go_to("Order Food")
+
         return
 
-    for order in orders[:30]:
+    for order in orders[:20]:
+
+        status = order.get(
+            "status",
+            "Confirmed"
+        )
+
+        payment_status = order.get(
+            "payment_status",
+            "-"
+        )
 
         with st.container(
             border=True
         ):
 
-            c1, c2, c3, c4 = st.columns(
-                [
-                    1,
-                    2,
-                    1.2,
-                    1.2,
-                ]
-            )
+            c1, c2, c3, c4 = st.columns(4)
 
             with c1:
 
@@ -2915,43 +2039,47 @@ def my_orders_page():
             with c2:
 
                 st.write(
-                    order_items_text(
-                        order
-                    )
+                    f"**Status**\n\n"
+                    f"{status}"
                 )
-
-                st.caption(
-                    order.get(
-                        "order_type",
-                        "",
-                    )
-                )
-
-                if order.get(
-                    "break_time"
-                ):
-
-                    st.caption(
-                        order[
-                            "break_time"
-                        ]
-                    )
 
             with c3:
 
                 st.write(
-                    f"**{order.get('status', '-')}**"
+                    f"**Payment**\n\n"
+                    f"{payment_status}"
                 )
 
             with c4:
 
                 st.write(
-                    f"**₹{order.get('total', 0):.0f}**"
+                    f"**Total**\n\n"
+                    f"₹{order.get('total', 0):.0f}"
                 )
 
+            if order.get("break_time"):
+
                 st.caption(
-                    f"Payment: "
-                    f"{order.get('payment_status', '-')}"
+                    f"Break: "
+                    f"{order['break_time']}"
+                )
+
+            item_text = ", ".join(
+                f"{x['name']} × {x['quantity']}"
+                for x in order.get(
+                    "items",
+                    []
+                )
+            )
+
+            st.write(
+                item_text
+            )
+
+            if status != "Collected":
+
+                st.info(
+                    "Bring your Order ID to the cafeteria desk for collection."
                 )
 
 
@@ -2978,51 +2106,75 @@ def wallet_page():
     balance = float(
         student.get(
             "wallet_balance",
-            0,
+            0
         )
     )
 
     st.markdown(
-        "## 💰 Prepaid Wallet / Coupon"
+        "## 💰 Wallet"
     )
 
     st.metric(
         "Available Balance",
-        f"₹{balance:.2f}",
+        f"₹{balance:.2f}"
     )
 
     st.info(
-        "Give money to the cafeteria desk "
-        "and ask Rahul to credit your Student ID."
+        "Give money to the cafeteria desk and ask the desk person to credit "
+        "the same amount to your prepaid wallet."
     )
 
     st.markdown(
-        "### How it works"
+        "### Wallet Top-up"
     )
 
-    st.write(
-        "1. Give money to the cafeteria desk."
+    amount = st.number_input(
+        "Amount to add",
+        min_value=1.0,
+        max_value=10000.0,
+        value=100.0,
+        step=50.0,
     )
 
-    st.write(
-        "2. Tell the desk your Student ID."
+    reason = st.text_input(
+        "Reason",
+        value="Cash deposited at cafeteria desk",
     )
 
-    st.write(
-        "3. Rahul credits your wallet."
-    )
+    if st.button(
+        "Add Wallet Money",
+        type="primary"
+    ):
 
-    st.write(
-        "4. Select Prepaid Wallet / Coupon when ordering."
-    )
+        ok, result = add_wallet_money(
+            student["uid"],
+            amount,
+            reason
+        )
 
-    st.write(
-        "5. Order amount is automatically deducted."
+        if ok:
+
+            st.success(
+                f"₹{amount:.2f} added. "
+                f"New balance: ₹{result:.2f}"
+            )
+
+            st.rerun()
+
+        else:
+
+            st.error(
+                str(result)
+            )
+
+    st.caption(
+        "For the prototype, the cafeteria desk controls wallet credits. "
+        "Do not treat the wallet as a live payment gateway."
     )
 
 
 # ============================================================
-# FEEDBACK
+# STUDENT FEEDBACK
 # ============================================================
 
 def feedback_page():
@@ -3045,7 +2197,7 @@ def feedback_page():
         "Rating",
         1,
         5,
-        5,
+        5
     )
 
     category = st.selectbox(
@@ -3055,27 +2207,17 @@ def feedback_page():
             "Taste",
             "Service",
             "Waiting Time",
-            "Other",
+            "Other"
         ],
     )
 
     message = st.text_area(
-        "Your Feedback"
-    )
-
-    photo = st.file_uploader(
-        "Add Photo (optional)",
-        type=[
-            "jpg",
-            "jpeg",
-            "png",
-        ],
+        "Your feedback"
     )
 
     if st.button(
         "Submit Feedback",
-        type="primary",
-        use_container_width=True,
+        type="primary"
     ):
 
         if not message.strip():
@@ -3086,38 +2228,24 @@ def feedback_page():
 
             return
 
-        photo_data = image_to_data_url(
-            photo
-        )
-
         db.collection(
             "feedback"
         ).add(
             {
-                "uid":
-                    student["uid"],
-                "student_name":
-                    student.get(
-                        "name",
-                        "",
-                    ),
-                "student_id":
-                    student.get(
-                        "student_id",
-                        "",
-                    ),
-                "rating":
-                    rating,
-                "category":
-                    category,
-                "message":
-                    message.strip(),
-                "photo":
-                    photo_data,
-                "created_at":
-                    firestore.SERVER_TIMESTAMP,
-                "date":
-                    date.today().isoformat(),
+                "uid": student["uid"],
+                "student_name": student.get(
+                    "name",
+                    ""
+                ),
+                "student_id": student.get(
+                    "student_id",
+                    ""
+                ),
+                "rating": rating,
+                "category": category,
+                "message": message.strip(),
+                "created_at": firestore.SERVER_TIMESTAMP,
+                "date": date.today().isoformat(),
             }
         )
 
@@ -3136,49 +2264,45 @@ def cafeteria_login_page():
         "## 🧑‍🍳 Cafeteria Portal"
     )
 
-    render_html(
+    st.markdown(
         """
-<div class="login-box">
-    <h3>Cafeteria Desk Login</h3>
-    <p style="color:#6b7280;">
-        Staff-only portal for managing
-        orders, menu and wallet credits.
-    </p>
-</div>
-"""
+        <div class="login-box">
+            <h3>Cafeteria Desk Login</h3>
+            <p class="small-muted">
+                This portal is for cafeteria staff only.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     login_id = st.text_input(
-        "Login ID",
-        placeholder="Enter cafeteria",
+        "Login ID"
     )
 
     password = st.text_input(
         "Password",
-        type="password",
-        placeholder="Enter password",
+        type="password"
     )
 
     if st.button(
         "Login to Cafeteria Portal",
         type="primary",
-        use_container_width=True,
+        use_container_width=True
     ):
 
         if (
-            login_id.strip().lower()
-            == CAFETERIA_LOGIN_ID.lower()
+            login_id.strip()
+            == CAFETERIA_LOGIN_ID
             and password
             == CAFETERIA_PASSWORD
         ):
 
-            st.session_state[
-                "cafeteria_logged_in"
-            ] = True
+            st.session_state.cafeteria_logged_in = True
 
-            st.session_state[
-                "page"
-            ] = "Cafeteria Dashboard"
+            st.session_state.page = (
+                "Cafeteria Dashboard"
+            )
 
             st.rerun()
 
@@ -3196,8 +2320,7 @@ def cafeteria_login_page():
 def cafeteria_dashboard_page():
 
     if not st.session_state.get(
-        "cafeteria_logged_in",
-        False,
+        "cafeteria_logged_in"
     ):
 
         go_to(
@@ -3211,78 +2334,76 @@ def cafeteria_dashboard_page():
     )
 
     st.info(
-        f"Desk: {DESK_NAME}  •  "
-        f"Phone: {DESK_PHONE}  •  "
+        f"Desk: {DESK_NAME} | "
+        f"Phone: {DESK_PHONE} | "
         f"Email: {DESK_EMAIL}"
     )
 
     orders = get_today_orders()
 
-    total_orders = len(
-        orders
+    total = len(orders)
+
+    confirmed = len(
+        [
+            x
+            for x in orders
+            if x.get("status")
+            == "Confirmed"
+        ]
     )
 
-    confirmed = sum(
-        1
-        for order in orders
-        if order.get(
-            "status"
-        )
-        == "Confirmed"
+    preparing = len(
+        [
+            x
+            for x in orders
+            if x.get("status")
+            == "Preparing"
+        ]
     )
 
-    preparing = sum(
-        1
-        for order in orders
-        if order.get(
-            "status"
-        )
-        == "Preparing"
+    ready = len(
+        [
+            x
+            for x in orders
+            if x.get("status")
+            == "Ready"
+        ]
     )
 
-    ready = sum(
-        1
-        for order in orders
-        if order.get(
-            "status"
-        )
-        == "Ready"
+    collected = len(
+        [
+            x
+            for x in orders
+            if x.get("status")
+            == "Collected"
+        ]
     )
 
-    collected = sum(
-        1
-        for order in orders
-        if order.get(
-            "status"
-        )
-        == "Collected"
-    )
+    cols = st.columns(5)
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-
-    c1.metric(
+    cols[0].metric(
         "📦 Total Orders",
-        total_orders,
+        total
     )
 
-    c2.metric(
+    cols[1].metric(
         "🔵 Confirmed",
-        confirmed,
+        confirmed
     )
 
-    c3.metric(
+    cols[2].metric(
         "🟠 Preparing",
-        preparing,
+        preparing
     )
 
-    c4.metric(
+    cols[3].metric(
         "🟢 Ready",
-        ready,
+        ready
     )
 
-    c5.metric(
+    cols[4].metric(
         "✅ Collected",
-        collected,
+        collected
     )
 
     st.markdown(
@@ -3298,7 +2419,8 @@ def cafeteria_dashboard_page():
         return
 
     search = st.text_input(
-        "🔎 Search by Order ID, Student or Student ID"
+        "Search by Order ID, Student Name or Student ID",
+        key="order_search",
     )
 
     status_filter = st.selectbox(
@@ -3308,80 +2430,49 @@ def cafeteria_dashboard_page():
             "Confirmed",
             "Preparing",
             "Ready",
-            "Collected",
+            "Collected"
         ],
     )
 
+    filtered = []
+
     for order in orders:
 
-        searchable = (
+        text = (
             f"{order.get('order_id', '')} "
             f"{order.get('student_name', '')} "
             f"{order.get('student_id', '')}"
         ).lower()
 
-        if (
-            search.strip().lower()
-            not in searchable
-        ):
-
+        if search.lower() not in text:
             continue
 
         if (
             status_filter != "All"
-            and order.get(
-                "status"
-            )
+            and order.get("status")
             != status_filter
         ):
-
             continue
 
-        order_id = order.get(
-            "order_id",
-            "-",
-        )
+        filtered.append(order)
 
-        order_type = order.get(
-            "order_type",
-            "Regular Order",
-        )
-
-        status = order.get(
-            "status",
-            "Confirmed",
-        )
-
-        payment_method = order.get(
-            "payment_method",
-            "-",
-        )
-
-        payment_status = order.get(
-            "payment_status",
-            "-",
-        )
+    for order in filtered:
 
         with st.container(
             border=True
         ):
 
-            top1, top2, top3, top4 = st.columns(
-                [
-                    1,
-                    2,
-                    2,
-                    1,
-                ]
+            c1, c2, c3, c4 = st.columns(
+                [1, 2.5, 1.5, 2]
             )
 
-            with top1:
+            with c1:
 
                 st.markdown(
-                    f"### #{order_id}"
+                    f"### #{order.get('order_id')}"
                 )
 
-            with top2:
+            with c2:
 
                 st.write(
                     f"**{order.get('student_name', '-')}**"
@@ -3392,345 +2483,150 @@ def cafeteria_dashboard_page():
                     f"{order.get('student_id', '-')}"
                 )
 
-            with top3:
+            with c3:
+
+                item_text = ", ".join(
+                    f"{x['name']} × {x['quantity']}"
+                    for x in order.get(
+                        "items",
+                        []
+                    )
+                )
 
                 st.write(
-                    order_items_text(
-                        order
-                    )
+                    item_text
                 )
-
-                caption = order_type
-
-                if order.get(
-                    "break_time"
-                ):
-
-                    caption += (
-                        " • "
-                        + order[
-                            "break_time"
-                        ]
-                    )
 
                 st.caption(
-                    caption
+                    f"₹{order.get('total', 0):.0f}"
                 )
 
-            with top4:
+            with c4:
 
-                st.metric(
-                    "Amount",
-                    f"₹{float(order.get('total', 0)):.0f}",
+                status = order.get(
+                    "status",
+                    "Confirmed"
                 )
 
-            st.divider()
-
-            a, b, c = st.columns(3)
-
-            with a:
+                payment_status = order.get(
+                    "payment_status",
+                    "Pending"
+                )
 
                 st.write(
                     f"**Status:** {status}"
                 )
 
-            with b:
-
                 st.write(
-                    f"**Payment:** "
-                    f"{payment_status}"
+                    f"**Payment:** {payment_status}"
                 )
 
-            with c:
-
-                st.write(
-                    f"**Method:** "
-                    f"{payment_method}"
-                )
-
-            # PAYMENT
-
-            if (
-                payment_method
-                == "Pay at Counter"
-                and payment_status
-                != "Paid"
-            ):
-
-                if st.button(
-                    "💵 Payment Received",
-                    key=f"payment_{order_id}",
-                    use_container_width=True,
+                if (
+                    order.get(
+                        "payment_method"
+                    )
+                    == "Pay at Counter"
+                    and payment_status != "Paid"
                 ):
 
-                    success, error = (
-                        mark_payment_received(
-                            order
-                        )
-                    )
+                    if st.button(
+                        "💵 Mark Payment Received",
+                        key=f"pay_{order.get('order_id')}",
+                    ):
 
-                    if success:
-
-                        st.success(
-                            "Payment marked as received."
-                        )
-
-                        st.rerun()
-
-                    else:
-
-                        st.error(
-                            error
+                        ok, error = (
+                            mark_counter_payment_received(
+                                order
+                            )
                         )
 
-            # REGULAR ORDER
+                        if ok:
 
-            if (
-                order_type
-                == "Regular Order"
-            ):
+                            st.success(
+                                "Payment marked as received."
+                            )
+
+                            st.rerun()
+
+                        else:
+
+                            st.error(
+                                error
+                            )
 
                 if status == "Confirmed":
 
                     if st.button(
                         "▶ Start Preparing",
-                        key=f"prepare_{order_id}",
-                        use_container_width=True,
+                        key=f"prep_{order.get('order_id')}",
                     ):
 
-                        success, error = (
+                        ok, error = (
                             update_order_status(
                                 order,
-                                "Preparing",
+                                "Preparing"
                             )
                         )
 
-                        if success:
-
+                        if ok:
                             st.rerun()
 
                         else:
-
-                            st.error(
-                                error
-                            )
+                            st.error(error)
 
                 elif status == "Preparing":
 
                     if st.button(
                         "✓ Mark Ready",
-                        key=f"ready_{order_id}",
-                        use_container_width=True,
+                        key=f"ready_{order.get('order_id')}",
                     ):
 
-                        success, error = (
+                        ok, error = (
                             update_order_status(
                                 order,
-                                "Ready",
+                                "Ready"
                             )
                         )
 
-                        if success:
-
+                        if ok:
                             st.rerun()
 
                         else:
-
-                            st.error(
-                                error
-                            )
+                            st.error(error)
 
                 elif status == "Ready":
 
                     if (
-                        payment_method
+                        order.get(
+                            "payment_method"
+                        )
                         == "Pay at Counter"
-                        and payment_status
-                        != "Paid"
+                        and payment_status != "Paid"
                     ):
 
                         st.warning(
-                            "Collect payment before "
-                            "marking this order collected."
+                            "Collect payment before handover."
                         )
 
                     else:
 
                         if st.button(
                             "📦 Mark Collected",
-                            key=f"collect_{order_id}",
-                            use_container_width=True,
+                            key=f"collect_{order.get('order_id')}",
                         ):
 
-                            success, error = (
+                            ok, error = (
                                 update_order_status(
                                     order,
-                                    "Collected",
+                                    "Collected"
                                 )
                             )
 
-                            if success:
-
+                            if ok:
                                 st.rerun()
 
                             else:
-
-                                st.error(
-                                    error
-                                )
-
-            # BREAK ORDER
-
-            else:
-
-                if status == "Confirmed":
-
-                    if (
-                        payment_method
-                        == "Pay at Counter"
-                        and payment_status
-                        != "Paid"
-                    ):
-
-                        st.warning(
-                            "Collect payment before "
-                            "marking this order collected."
-                        )
-
-                    else:
-
-                        if st.button(
-                            "📦 Mark Collected",
-                            key=f"break_collect_{order_id}",
-                            use_container_width=True,
-                        ):
-
-                            success, error = (
-                                update_order_status(
-                                    order,
-                                    "Collected",
-                                )
-                            )
-
-                            if success:
-
-                                st.rerun()
-
-                            else:
-
-                                st.error(
-                                    error
-                                )
-
-
-# ============================================================
-# WALLET MANAGEMENT
-# ============================================================
-
-def wallet_management_page():
-
-    if not st.session_state.get(
-        "cafeteria_logged_in",
-        False,
-    ):
-
-        go_to(
-            "Cafeteria Portal"
-        )
-
-        return
-
-    st.markdown(
-        "## 💰 Wallet / Coupon Management"
-    )
-
-    st.info(
-        "When a student gives money to the "
-        "cafeteria, credit the same amount "
-        "to their Student ID."
-    )
-
-    student_id = st.text_input(
-        "Student ID / Roll Number"
-    )
-
-    amount = st.number_input(
-        "Amount to Credit",
-        min_value=1.0,
-        max_value=50000.0,
-        value=100.0,
-        step=50.0,
-    )
-
-    reason = st.text_input(
-        "Reason",
-        value="Prepaid cafeteria coupon / wallet top-up",
-    )
-
-    if st.button(
-        "💰 Credit Wallet",
-        type="primary",
-        use_container_width=True,
-    ):
-
-        if not student_id.strip():
-
-            st.error(
-                "Enter Student ID."
-            )
-
-            return
-
-        query = (
-            db.collection("users")
-            .where(
-                "student_id",
-                "==",
-                student_id.strip(),
-            )
-            .limit(1)
-            .stream()
-        )
-
-        student_doc = None
-
-        for doc in query:
-
-            student_doc = doc
-
-            break
-
-        if not student_doc:
-
-            st.error(
-                "Student account not found."
-            )
-
-            return
-
-        success, result = credit_wallet(
-            student_doc.id,
-            amount,
-            reason,
-        )
-
-        if success:
-
-            profile = get_user_profile(
-                student_doc.id
-            )
-
-            st.success(
-                f"₹{amount:.2f} credited successfully. "
-                f"New balance: "
-                f"₹{float(profile.get('wallet_balance', 0)):.2f}"
-            )
-
-        else:
-
-            st.error(
-                str(result)
-            )
+                                st.error(error)
 
 
 # ============================================================
@@ -3740,8 +2636,7 @@ def wallet_management_page():
 def menu_management_page():
 
     if not st.session_state.get(
-        "cafeteria_logged_in",
-        False,
+        "cafeteria_logged_in"
     ):
 
         go_to(
@@ -3754,18 +2649,20 @@ def menu_management_page():
         "## 🍔 Menu Management"
     )
 
+    menu = load_menu()
+
     st.markdown(
-        "### Add / Update Food"
+        "### Add / Update Item"
     )
 
     name = st.text_input(
-        "Food Name"
+        "Item Name"
     )
 
     price = st.number_input(
         "Price",
-        min_value=1.0,
-        step=5.0,
+        min_value=0.0,
+        step=5.0
     )
 
     discount = st.number_input(
@@ -3778,156 +2675,121 @@ def menu_management_page():
 
     available = st.checkbox(
         "Available",
-        value=True,
+        value=True
     )
 
     popular = st.checkbox(
-        "⭐ Popular Pick",
-        value=False,
-    )
-
-    image_file = st.file_uploader(
-        "📸 Food Photo",
-        type=[
-            "jpg",
-            "jpeg",
-            "png",
-        ],
+        "Popular Pick",
+        value=False
     )
 
     if st.button(
-        "💾 Save Food Item",
-        type="primary",
-        use_container_width=True,
+        "Save Item",
+        type="primary"
     ):
 
         if not name.strip():
 
             st.error(
-                "Enter food name."
+                "Enter an item name."
             )
 
-            return
+        elif price <= 0:
 
-        image = image_to_data_url(
-            image_file
-        )
+            st.error(
+                "Price must be greater than zero."
+            )
 
-        save_menu_item(
-            name.strip(),
-            price,
-            discount,
-            available,
-            popular,
-            image,
-        )
+        else:
 
-        st.success(
-            "Food item saved."
-        )
+            save_menu_item(
+                name.strip(),
+                price,
+                discount,
+                available,
+                popular,
+            )
 
-        st.rerun()
+            st.success(
+                "Menu item saved."
+            )
+
+            st.rerun()
 
     st.markdown(
         "### Current Menu"
     )
 
-    menu = load_menu()
-
     for item in menu:
 
-        with st.container(
-            border=True
-        ):
+        c1, c2, c3, c4 = st.columns(
+            [3, 1, 1, 1]
+        )
 
-            c1, c2, c3, c4 = st.columns(
-                [
-                    3,
-                    1,
-                    1,
-                    1,
-                ]
+        with c1:
+
+            price_text = (
+                f"₹{effective_price(item):.0f}"
             )
 
-            with c1:
+            if item.get(
+                "discount",
+                0
+            ):
 
+                price_text += (
+                    f" ({item.get('discount')}% off)"
+                )
+
+            st.write(
+                f"**{item['name']}** — "
+                f"{price_text}"
+            )
+
+        with c2:
+
+            st.write(
+                "Available"
                 if item.get(
-                    "image"
-                ):
+                    "available",
+                    True
+                )
+                else "Unavailable"
+            )
 
-                    st.image(
-                        item["image"],
-                        width=140,
-                    )
+        with c3:
 
-                st.write(
-                    f"**{item['name']}**"
+            st.write(
+                "⭐ Popular"
+                if item.get(
+                    "popular",
+                    False
+                )
+                else ""
+            )
+
+        with c4:
+
+            if st.button(
+                "Delete",
+                key=f"delete_{item['name']}"
+            ):
+
+                delete_menu_item(
+                    item["name"]
                 )
 
-                st.write(
-                    f"Price: "
-                    f"₹{effective_price(item):.0f}"
-                )
-
-                if float(
-                    item.get(
-                        "discount",
-                        0,
-                    )
-                ) > 0:
-
-                    st.caption(
-                        f"Discount: "
-                        f"{item['discount']}%"
-                    )
-
-            with c2:
-
-                st.write(
-                    "🟢 Available"
-                    if item.get(
-                        "available",
-                        True,
-                    )
-                    else
-                    "🔴 Unavailable"
-                )
-
-            with c3:
-
-                st.write(
-                    "⭐ Popular"
-                    if item.get(
-                        "popular",
-                        False,
-                    )
-                    else
-                    "Not Popular"
-                )
-
-            with c4:
-
-                if st.button(
-                    "Delete",
-                    key=f"delete_{item.get('_doc_id', item['name'])}",
-                ):
-
-                    delete_menu_item(
-                        item
-                    )
-
-                    st.rerun()
+                st.rerun()
 
 
 # ============================================================
-# FEEDBACK MANAGEMENT
+# CAFETERIA FEEDBACK
 # ============================================================
 
 def feedback_management_page():
 
     if not st.session_state.get(
-        "cafeteria_logged_in",
-        False,
+        "cafeteria_logged_in"
     ):
 
         go_to(
@@ -3940,15 +2802,14 @@ def feedback_management_page():
         "## 💬 Feedback Management"
     )
 
-    feedback_docs = (
-        db.collection(
-            "feedback"
-        ).stream()
+    docs = (
+        db.collection("feedback")
+        .stream()
     )
 
     feedback = [
         doc.to_dict()
-        for doc in feedback_docs
+        for doc in docs
     ]
 
     if not feedback:
@@ -3968,80 +2829,27 @@ def feedback_management_page():
         ):
 
             st.write(
-                f"**{item.get('student_name', '-')}** "
-                f"— ⭐ {item.get('rating', '-')}/5"
+                f"**{item.get('student_name', '-')}** — "
+                f"⭐ {item.get('rating', '-')}/5"
             )
 
             st.caption(
                 item.get(
                     "category",
-                    "",
+                    ""
                 )
             )
 
             st.write(
                 item.get(
                     "message",
-                    "",
+                    ""
                 )
             )
 
-            if item.get(
-                "photo"
-            ):
-
-                st.image(
-                    item["photo"],
-                    width=250,
-                )
-
 
 # ============================================================
-# CLEANUP
-# ============================================================
-
-def cleanup_page():
-
-    if not st.session_state.get(
-        "cafeteria_logged_in",
-        False,
-    ):
-
-        go_to(
-            "Cafeteria Portal"
-        )
-
-        return
-
-    st.markdown(
-        "## 🧹 Data Cleanup"
-    )
-
-    st.info(
-        "Orders and feedback older than "
-        "14 days can be removed."
-    )
-
-    if st.button(
-        "Run 14-Day Cleanup",
-        type="primary",
-        use_container_width=True,
-    ):
-
-        orders_removed, feedback_removed = (
-            cleanup_old_records(
-                14
-            )
-        )
-
-        st.success(
-            f"Removed {orders_removed} old orders "
-            f"and {feedback_removed} old feedback records."
-        )
-
-
-# ============================================================
-# FIREBASE ERROR
+# MAIN ROUTER
 # ============================================================
 
 if not firebase_connected:
@@ -4057,22 +2865,17 @@ if not firebase_connected:
     st.stop()
 
 
-# ============================================================
-# NAVIGATION
-# ============================================================
+st.success(
+    "🟢 Firebase connected successfully",
+    icon="🟢"
+)
 
-render_navigation()
-
-
-# ============================================================
-# ROUTER
-# ============================================================
+render_nav()
 
 page = st.session_state.get(
     "page",
-    "Home",
+    "Home"
 )
-
 
 if page == "Home":
 
@@ -4110,10 +2913,6 @@ elif page == "Cafeteria Dashboard":
 
     cafeteria_dashboard_page()
 
-elif page == "Wallet Management":
-
-    wallet_management_page()
-
 elif page == "Menu Management":
 
     menu_management_page()
@@ -4121,10 +2920,6 @@ elif page == "Menu Management":
 elif page == "Feedback Management":
 
     feedback_management_page()
-
-elif page == "Cleanup":
-
-    cleanup_page()
 
 else:
 
