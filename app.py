@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, time
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import streamlit as st
@@ -19,7 +19,7 @@ st.set_page_config(
 
 
 # =========================================================
-# CUSTOM STYLE
+# CUSTOM CSS
 # =========================================================
 
 st.markdown(
@@ -34,20 +34,26 @@ st.markdown(
 
     .subtitle {
         font-size: 18px;
-        color: #666666;
+        color: #666;
         margin-bottom: 25px;
     }
 
-    .order-card {
-        padding: 18px;
-        border-radius: 12px;
-        border: 1px solid #dddddd;
-        margin-bottom: 15px;
+    .discount-price {
+        font-size: 20px;
+        font-weight: 700;
     }
 
-    .small-muted {
-        color: #777777;
-        font-size: 14px;
+    .old-price {
+        color: #888;
+        text-decoration: line-through;
+        margin-right: 8px;
+    }
+
+    .offer-box {
+        padding: 10px;
+        border-radius: 10px;
+        background-color: #fff4e5;
+        margin-top: 8px;
     }
 
     </style>
@@ -57,7 +63,7 @@ st.markdown(
 
 
 # =========================================================
-# FIREBASE CONNECTION
+# FIREBASE
 # =========================================================
 
 @st.cache_resource
@@ -81,7 +87,7 @@ def initialize_firebase():
 
         return firestore.client(), True
 
-    except Exception:
+    except Exception as e:
 
         return None, False
 
@@ -90,44 +96,50 @@ db, firebase_connected = initialize_firebase()
 
 
 # =========================================================
-# MENU
+# DEFAULT MENU
 # =========================================================
 
-MENU = {
+DEFAULT_MENU = {
 
     "Tea": {
         "price": 15,
-        "status": "Ready",
+        "discount": 0,
+        "available": True,
         "emoji": "☕"
     },
 
     "Sandwich": {
         "price": 40,
-        "status": "Prepared",
+        "discount": 0,
+        "available": True,
         "emoji": "🥪"
     },
 
     "Maggi": {
         "price": 35,
-        "status": "Prepared",
+        "discount": 0,
+        "available": True,
         "emoji": "🍜"
     },
 
     "Cold Coffee": {
         "price": 30,
-        "status": "Ready",
+        "discount": 0,
+        "available": True,
         "emoji": "🥤"
     },
 
     "Veg Roll": {
         "price": 45,
-        "status": "Prepared",
+        "discount": 0,
+        "available": True,
         "emoji": "🌯"
     },
 
     "Water Bottle": {
         "price": 20,
-        "status": "Ready",
+        "discount": 0,
+        "available": True,
         "emoji": "💧"
     }
 }
@@ -139,69 +151,21 @@ MENU = {
 
 BREAK_OPTIONS = [
 
-    "2nd Year | 10:30 AM – 11:00 AM",
-    "1st Year | 11:00 AM – 11:30 AM",
+    "Senior Batch | 12:30 PM – 2:00 PM",
 
-    "2nd Year | 12:30 PM – 1:00 PM",
-    "1st Year | 1:00 PM – 1:30 PM",
-
-    "2nd Year | 2:30 PM – 3:00 PM",
-    "1st Year | 3:00 PM – 3:30 PM",
-
-    "2nd Year | 4:30 PM – 5:00 PM",
-    "1st Year | 5:00 PM – 5:30 PM",
-
-    "2nd Year | 6:30 PM – 7:00 PM",
-    "1st Year | 7:00 PM – 7:30 PM",
-
-    "2nd Year | 8:30 PM – 9:00 PM",
-    "1st Year | 9:00 PM – 9:30 PM"
+    "First Year / Junior Batch | 1:00 PM – 2:00 PM"
 ]
 
 
-# =========================================================
-# ACTUAL BREAK WINDOWS
-# =========================================================
+# These windows are ONLY used to identify break periods.
+# Regular orders are NOT blocked during these periods.
 
 BREAK_WINDOWS = [
 
-    (time(10, 30), time(11, 0)),
-    (time(11, 0), time(11, 30)),
+    ("Senior Batch", 12, 30, 14, 0),
 
-    (time(12, 30), time(13, 0)),
-    (time(13, 0), time(13, 30)),
-
-    (time(14, 30), time(15, 0)),
-    (time(15, 0), time(15, 30)),
-
-    (time(16, 30), time(17, 0)),
-    (time(17, 0), time(17, 30)),
-
-    (time(18, 30), time(19, 0)),
-    (time(19, 0), time(19, 30)),
-
-    (time(20, 30), time(21, 0)),
-    (time(21, 0), time(21, 30))
+    ("First Year / Junior Batch", 13, 0, 14, 0)
 ]
-
-
-# =========================================================
-# CHECK WHETHER CURRENT TIME IS BREAK TIME
-# =========================================================
-
-def is_break_time():
-
-    now = datetime.now(
-        ZoneInfo("Asia/Kolkata")
-    ).time()
-
-    for start, end in BREAK_WINDOWS:
-
-        if start <= now < end:
-
-            return True
-
-    return False
 
 
 # =========================================================
@@ -224,7 +188,82 @@ if "last_order" not in st.session_state:
 
 
 # =========================================================
-# CART FUNCTIONS
+# TIME
+# =========================================================
+
+def current_india_time():
+
+    return datetime.now(
+        ZoneInfo("Asia/Kolkata")
+    )
+
+
+# =========================================================
+# MENU FUNCTIONS
+# =========================================================
+
+def load_menu():
+
+    menu = {}
+
+    try:
+
+        docs = (
+            db.collection("menu")
+            .stream()
+        )
+
+        for doc in docs:
+
+            data = doc.to_dict()
+
+            menu[doc.id] = data
+
+    except Exception:
+
+        menu = {}
+
+    if not menu:
+
+        for item, data in DEFAULT_MENU.items():
+
+            try:
+
+                db.collection(
+                    "menu"
+                ).document(
+                    item
+                ).set(
+                    data
+                )
+
+                menu[item] = data
+
+            except Exception:
+
+                pass
+
+    return menu
+
+
+def discounted_price(item_data):
+
+    price = float(
+        item_data.get("price", 0)
+    )
+
+    discount = float(
+        item_data.get("discount", 0)
+    )
+
+    return round(
+        price * (1 - discount / 100),
+        2
+    )
+
+
+# =========================================================
+# CART
 # =========================================================
 
 def add_to_cart(item):
@@ -261,18 +300,24 @@ def cart_count():
     )
 
 
-def cart_total():
+def cart_total(menu):
 
     total = 0
 
-    for item, quantity in st.session_state.cart.items():
+    for item, quantity in (
+        st.session_state.cart.items()
+    ):
 
-        total += (
-            MENU[item]["price"] *
-            quantity
-        )
+        if item in menu:
 
-    return total
+            total += (
+                discounted_price(
+                    menu[item]
+                )
+                * quantity
+            )
+
+    return round(total, 2)
 
 
 # =========================================================
@@ -281,19 +326,14 @@ def cart_total():
 
 def generate_daily_order_id():
 
-    if db is None:
+    today = current_india_time().strftime(
+        "%Y-%m-%d"
+    )
 
-        return datetime.now().strftime(
-            "%H%M%S"
-        )
-
-    today = datetime.now(
-        ZoneInfo("Asia/Kolkata")
-    ).strftime("%Y-%m-%d")
-
-    counter_ref = db.collection(
-        "counters"
-    ).document(today)
+    counter_ref = (
+        db.collection("counters")
+        .document(today)
+    )
 
     transaction = db.transaction()
 
@@ -306,24 +346,25 @@ def generate_daily_order_id():
 
         if snapshot.exists:
 
-            data = snapshot.to_dict()
-
-            last_number = data.get(
+            old_number = snapshot.to_dict().get(
                 "last_order_number",
                 0
             )
 
         else:
 
-            last_number = 0
+            old_number = 0
 
-        new_number = last_number + 1
+        new_number = old_number + 1
 
         transaction.set(
             counter_ref,
             {
-                "last_order_number": new_number,
-                "date": today
+                "last_order_number":
+                    new_number,
+
+                "date":
+                    today
             }
         )
 
@@ -337,13 +378,53 @@ def generate_daily_order_id():
 
 
 # =========================================================
-# HOME PAGE
+# BREAK STATUS
+# =========================================================
+
+def current_break():
+
+    now = current_india_time()
+
+    current_minutes = (
+        now.hour * 60
+        + now.minute
+    )
+
+    for (
+        name,
+        start_h,
+        start_m,
+        end_h,
+        end_m
+    ) in BREAK_WINDOWS:
+
+        start = (
+            start_h * 60
+            + start_m
+        )
+
+        end = (
+            end_h * 60
+            + end_m
+        )
+
+        if start <= current_minutes < end:
+
+            return name
+
+    return None
+
+
+# =========================================================
+# HOME
 # =========================================================
 
 def home_page():
 
     st.markdown(
-        '<div class="main-title">🍽️ Campus Cafeteria</div>',
+        '<div class="main-title">'
+        '🍽️ Campus Cafeteria'
+        '</div>',
         unsafe_allow_html=True
     )
 
@@ -354,15 +435,17 @@ def home_page():
         unsafe_allow_html=True
     )
 
-    col1, col2 = st.columns(2)
+    c1, c2 = st.columns(2)
 
-    with col1:
+    with c1:
 
-        st.markdown("## 🎓 Student Portal")
+        st.subheader(
+            "🎓 Student Portal"
+        )
 
         st.write(
-            "Pre-order food, track your order and "
-            "collect it using your Order ID."
+            "Order food, track your order "
+            "and collect using your Order ID."
         )
 
         if st.button(
@@ -375,13 +458,15 @@ def home_page():
 
             st.rerun()
 
-    with col2:
+    with c2:
 
-        st.markdown("## 👨‍🍳 Cafeteria Portal")
+        st.subheader(
+            "👨‍🍳 Cafeteria Portal"
+        )
 
         st.write(
-            "Manage today's orders, preparation "
-            "and collection."
+            "Manage orders, menu, offers "
+            "and customer feedback."
         )
 
         if st.button(
@@ -395,9 +480,11 @@ def home_page():
 
     st.divider()
 
-    st.subheader("⚡ Quick Actions")
+    st.subheader(
+        "⚡ Quick Actions"
+    )
 
-    q1, q2, q3 = st.columns(3)
+    q1, q2 = st.columns(2)
 
     with q1:
 
@@ -421,51 +508,40 @@ def home_page():
 
             st.rerun()
 
-    with q3:
-
-        st.info(
-            "🍴 Fresh food • Less waiting"
-        )
-
 
 # =========================================================
-# STUDENT PAGE
+# STUDENT ORDER PAGE
 # =========================================================
 
 def student_page():
 
+    menu = load_menu()
+
     st.markdown(
-        '<div class="main-title">🎓 Student Ordering</div>',
+        '<div class="main-title">'
+        '🎓 Student Ordering'
+        '</div>',
         unsafe_allow_html=True
     )
 
-    col1, col2 = st.columns([5, 1])
+    if st.button(
+        "🏠 Return to Home",
+        type="primary"
+    ):
 
-    with col1:
+        st.session_state.page = "home"
 
-        st.caption(
-            f"🛒 {cart_count()} item(s) in cart"
-        )
-
-    with col2:
-
-        if st.button(
-            "🏠 Home",
-            type="primary",
-            use_container_width=True
-        ):
-
-            st.session_state.page = "home"
-
-            st.rerun()
+        st.rerun()
 
     st.divider()
 
-    # =====================================================
-    # STUDENT DETAILS
-    # =====================================================
+    # -----------------------------------------------------
+    # DETAILS
+    # -----------------------------------------------------
 
-    st.subheader("1. Student Details")
+    st.subheader(
+        "1. Student Details"
+    )
 
     c1, c2 = st.columns(2)
 
@@ -483,14 +559,16 @@ def student_page():
             placeholder="Enter your student ID"
         )
 
-    # =====================================================
+    # -----------------------------------------------------
     # ORDER TYPE
-    # =====================================================
+    # -----------------------------------------------------
 
-    st.subheader("2. Order Type")
+    st.subheader(
+        "2. Order Type"
+    )
 
     order_type = st.radio(
-        "Choose how you want to order",
+        "Choose your order type",
         [
             "Break Order",
             "Regular Order"
@@ -499,11 +577,6 @@ def student_page():
     )
 
     break_time = None
-    regular_source = None
-
-    # =====================================================
-    # BREAK ORDER
-    # =====================================================
 
     if order_type == "Break Order":
 
@@ -517,82 +590,100 @@ def student_page():
         )
 
         st.info(
-            "💡 Break orders are prepared in advance. "
-            "Collect your order during the selected break."
+            "💡 Your food will be prepared "
+            "in advance for the selected break."
         )
-
-    # =====================================================
-    # REGULAR ORDER
-    # =====================================================
 
     else:
 
-        if is_break_time():
+        st.markdown(
+            "#### 🏠 Room / Hostel Pre-order"
+        )
 
-            st.warning(
-                "🚨 Regular orders are temporarily "
-                "unavailable during the break rush."
-            )
+        st.info(
+            "Order from your room or hostel. "
+            "The cafeteria will prepare it and "
+            "you can collect it from the counter."
+        )
 
-            st.info(
-                "Please place a Break Order for the "
-                "current break or try again after the break."
-            )
+        st.success(
+            "⏱️ Typical preparation time: "
+            "around 10–15 minutes."
+        )
 
-        else:
-
-            regular_source = (
-                "Room / Hostel — Pre-order"
-            )
-
-            st.markdown(
-                "#### 🏠 Room / Hostel Pre-order"
-            )
-
-            st.info(
-                "Order from your room or hostel and "
-                "collect your food from the cafeteria "
-                "when it is ready."
-            )
-
-            st.success(
-                "⏱️ Estimated preparation time: "
-                "approximately 10–15 minutes."
-            )
-
-    # =====================================================
-    # POPULAR ITEMS
-    # =====================================================
+    # -----------------------------------------------------
+    # POPULAR
+    # -----------------------------------------------------
 
     st.divider()
 
-    st.subheader("🔥 Popular Picks")
+    st.subheader(
+        "🔥 Popular Picks"
+    )
 
-    popular_items = [
-        "Tea",
-        "Veg Roll",
-        "Sandwich"
+    available_items = [
+        item
+        for item, data in menu.items()
+        if data.get("available", True)
     ]
 
-    p1, p2, p3 = st.columns(3)
+    popular = [
+        item
+        for item in [
+            "Tea",
+            "Veg Roll",
+            "Sandwich"
+        ]
+        if item in available_items
+    ]
+
+    cols = st.columns(
+        max(1, len(popular))
+    )
 
     for col, item in zip(
-        [p1, p2, p3],
-        popular_items
+        cols,
+        popular
     ):
 
         with col:
 
+            data = menu[item]
+
             st.markdown(
-                f"**{MENU[item]['emoji']} {item}**"
+                f"### "
+                f"{data.get('emoji', '🍽️')} "
+                f"{item}"
             )
 
-            st.write(
-                f"₹{MENU[item]['price']}"
+            price = discounted_price(
+                data
             )
+
+            discount = float(
+                data.get("discount", 0)
+            )
+
+            if discount > 0:
+
+                st.markdown(
+                    f'<span class="old-price">'
+                    f'₹{data["price"]}'
+                    f'</span>'
+                    f'<span class="discount-price">'
+                    f'₹{price}'
+                    f'</span>',
+                    unsafe_allow_html=True
+                )
+
+            else:
+
+                st.write(
+                    f"₹{price:.0f}"
+                )
 
             if st.button(
-                f"Add {item}",
+                "Add",
                 key=f"popular_{item}",
                 use_container_width=True
             ):
@@ -601,90 +692,147 @@ def student_page():
 
                 st.rerun()
 
-    # =====================================================
+    # -----------------------------------------------------
     # MENU
-    # =====================================================
+    # -----------------------------------------------------
 
     st.divider()
 
-    st.subheader("3. Menu")
+    st.subheader(
+        "3. Menu"
+    )
 
-    menu_items = list(MENU.keys())
+    available_menu = {
 
-    for i in range(
-        0,
-        len(menu_items),
-        3
-    ):
+        item: data
 
-        cols = st.columns(3)
+        for item, data in menu.items()
 
-        for j, col in enumerate(cols):
+        if data.get(
+            "available",
+            True
+        )
+    }
 
-            if i + j >= len(menu_items):
+    if not available_menu:
 
-                continue
+        st.warning(
+            "No menu items are currently available."
+        )
 
-            item = menu_items[i + j]
+    else:
 
-            with col:
+        menu_items = list(
+            available_menu.keys()
+        )
 
-                st.markdown(
-                    f"### "
-                    f"{MENU[item]['emoji']} "
-                    f"{item}"
-                )
+        for i in range(
+            0,
+            len(menu_items),
+            3
+        ):
 
-                st.markdown(
-                    f"**₹{MENU[item]['price']}**"
-                )
+            cols = st.columns(3)
 
-                if MENU[item]["status"] == "Ready":
+            for j, col in enumerate(cols):
 
-                    st.success(
-                        "✓ Usually ready"
+                if i + j >= len(menu_items):
+
+                    continue
+
+                item = menu_items[i + j]
+
+                data = available_menu[item]
+
+                with col:
+
+                    st.markdown(
+                        f"### "
+                        f"{data.get('emoji', '🍽️')} "
+                        f"{item}"
                     )
 
-                else:
-
-                    st.warning(
-                        "⏱ Prepared on order"
+                    original_price = float(
+                        data.get(
+                            "price",
+                            0
+                        )
                     )
 
-                if item in st.session_state.cart:
-
-                    quantity = (
-                        st.session_state.cart[item]
+                    final_price = discounted_price(
+                        data
                     )
 
-                    a, b, c = st.columns(3)
+                    discount = float(
+                        data.get(
+                            "discount",
+                            0
+                        )
+                    )
 
-                    with a:
-
-                        if st.button(
-                            "−",
-                            key=f"minus_{item}",
-                            use_container_width=True
-                        ):
-
-                            remove_from_cart(item)
-
-                            st.rerun()
-
-                    with b:
+                    if discount > 0:
 
                         st.markdown(
-                            f"<h3 style='text-align:center'>"
-                            f"{quantity}"
-                            f"</h3>",
+                            f'<span class="old-price">'
+                            f'₹{original_price:.0f}'
+                            f'</span>'
+                            f'<span class="discount-price">'
+                            f'₹{final_price:.0f}'
+                            f'</span>',
                             unsafe_allow_html=True
                         )
 
-                    with c:
+                        st.caption(
+                            f"🔥 {discount:.0f}% OFF"
+                        )
+
+                    else:
+
+                        st.write(
+                            f"₹{final_price:.0f}"
+                        )
+
+                    if item in st.session_state.cart:
+
+                        quantity = (
+                            st.session_state.cart[item]
+                        )
+
+                        a, b, c = st.columns(3)
+
+                        with a:
+
+                            if st.button(
+                                "−",
+                                key=f"minus_{item}"
+                            ):
+
+                                remove_from_cart(item)
+
+                                st.rerun()
+
+                        with b:
+
+                            st.write(
+                                f"**{quantity}**"
+                            )
+
+                        with c:
+
+                            if st.button(
+                                "+",
+                                key=f"plus_{item}"
+                            ):
+
+                                add_to_cart(item)
+
+                                st.rerun()
+
+                    else:
 
                         if st.button(
-                            "+",
-                            key=f"plus_{item}",
+                            "Add to Cart",
+                            key=f"add_{item}",
                             use_container_width=True
                         ):
 
@@ -692,21 +840,9 @@ def student_page():
 
                             st.rerun()
 
-                else:
-
-                    if st.button(
-                        "Add to Cart",
-                        key=f"add_{item}",
-                        use_container_width=True
-                    ):
-
-                        add_to_cart(item)
-
-                        st.rerun()
-
-    # =====================================================
+    # -----------------------------------------------------
     # CART
-    # =====================================================
+    # -----------------------------------------------------
 
     st.divider()
 
@@ -726,13 +862,18 @@ def student_page():
             st.session_state.cart.items()
         ):
 
-            item_total = (
-                MENU[item]["price"] *
-                quantity
+            if item not in menu:
+
+                continue
+
+            price = discounted_price(
+                menu[item]
             )
 
+            total = price * quantity
+
             c1, c2, c3 = st.columns(
-                [4, 2, 2]
+                [5, 2, 2]
             )
 
             with c1:
@@ -750,22 +891,14 @@ def student_page():
             with c3:
 
                 st.write(
-                    f"₹{item_total}"
+                    f"₹{total:.0f}"
                 )
 
         st.divider()
 
-        c1, c2 = st.columns(2)
-
-        with c1:
-
-            st.markdown("### Total")
-
-        with c2:
-
-            st.markdown(
-                f"### ₹{cart_total()}"
-            )
+        st.markdown(
+            f"### Total: ₹{cart_total(menu):.0f}"
+        )
 
         if st.button(
             "🗑️ Clear Cart",
@@ -776,173 +909,147 @@ def student_page():
 
             st.rerun()
 
-    # =====================================================
+    # -----------------------------------------------------
     # PLACE ORDER
-    # =====================================================
+    # -----------------------------------------------------
 
     st.divider()
 
     if st.session_state.cart:
 
-        # Regular orders cannot be placed during
-        # a break rush.
+        if st.button(
+            "🍽️ Place Order",
+            type="primary",
+            use_container_width=True
+        ):
 
-        regular_blocked = (
-            order_type == "Regular Order"
-            and is_break_time()
-        )
+            if not student_name.strip():
 
-        if regular_blocked:
+                st.error(
+                    "Please enter your name."
+                )
 
-            st.warning(
-                "Regular ordering is currently paused "
-                "because the cafeteria is serving the "
-                "break rush."
-            )
+            elif not student_id.strip():
 
-        else:
+                st.error(
+                    "Please enter your Student ID."
+                )
 
-            if st.button(
-                "🍽️ Place Order",
-                type="primary",
-                use_container_width=True
-            ):
+            else:
 
-                if not student_name.strip():
+                try:
 
-                    st.error(
-                        "Please enter your name."
+                    order_id = (
+                        generate_daily_order_id()
                     )
 
-                elif not student_id.strip():
+                    if order_type == "Break Order":
 
-                    st.error(
-                        "Please enter your Student ID."
-                    )
+                        status = "Confirmed"
 
-                else:
+                    else:
 
-                    try:
+                        all_ready = all(
 
-                        order_id = (
-                            generate_daily_order_id()
+                            item in menu
+                            and
+                            menu[item].get(
+                                "available",
+                                True
+                            )
+
+                            for item
+                            in st.session_state.cart
                         )
 
-                        if order_type == "Break Order":
+                        if all_ready:
 
-                            initial_status = (
-                                "Confirmed"
-                            )
+                            status = "Ready"
 
                         else:
 
-                            all_ready = all(
-                                MENU[item]["status"]
-                                == "Ready"
-                                for item
-                                in st.session_state.cart
+                            status = "Confirmed"
+
+                    order_data = {
+
+                        "order_id":
+                            order_id,
+
+                        "student_name":
+                            student_name.strip(),
+
+                        "student_id":
+                            student_id.strip(),
+
+                        "order_type":
+                            order_type,
+
+                        "break_time":
+                            break_time,
+
+                        "regular_source":
+                            (
+                                "Room / Hostel — Pre-order"
+                                if order_type
+                                == "Regular Order"
+                                else None
+                            ),
+
+                        "items":
+                            dict(
+                                st.session_state.cart
+                            ),
+
+                        "total":
+                            cart_total(menu),
+
+                        "status":
+                            status,
+
+                        "date":
+                            current_india_time().strftime(
+                                "%Y-%m-%d"
+                            ),
+
+                        "created_at":
+                            current_india_time(),
+
+                        "estimated_time":
+                            (
+                                "Break collection"
+                                if order_type
+                                == "Break Order"
+                                else "10–15 minutes"
                             )
+                    }
 
-                            if all_ready:
+                    db.collection(
+                        "orders"
+                    ).add(
+                        order_data
+                    )
 
-                                initial_status = (
-                                    "Ready"
-                                )
+                    st.session_state.last_order = (
+                        order_data
+                    )
 
-                            else:
+                    clear_cart()
 
-                                initial_status = (
-                                    "Confirmed"
-                                )
+                    st.session_state.page = (
+                        "confirmation"
+                    )
 
-                        order_data = {
+                    st.rerun()
 
-                            "order_id": order_id,
+                except Exception as e:
 
-                            "student_name":
-                                student_name.strip(),
-
-                            "student_id":
-                                student_id.strip(),
-
-                            "order_type":
-                                order_type,
-
-                            "break_time":
-                                break_time,
-
-                            "regular_source":
-                                regular_source,
-
-                            "items":
-                                dict(
-                                    st.session_state.cart
-                                ),
-
-                            "total":
-                                cart_total(),
-
-                            "status":
-                                initial_status,
-
-                            "date":
-                                datetime.now(
-                                    ZoneInfo(
-                                        "Asia/Kolkata"
-                                    )
-                                ).strftime(
-                                    "%Y-%m-%d"
-                                ),
-
-                            "created_at":
-                                datetime.now(
-                                    ZoneInfo(
-                                        "Asia/Kolkata"
-                                    )
-                                ),
-
-                            "estimated_time":
-                                "10–15 minutes",
-
-                            "feedback_submitted":
-                                False
-                        }
-
-                        if db is None:
-
-                            st.error(
-                                "Firebase is not connected."
-                            )
-
-                        else:
-
-                            db.collection(
-                                "orders"
-                            ).add(
-                                order_data
-                            )
-
-                            st.session_state.last_order = (
-                                order_data
-                            )
-
-                            clear_cart()
-
-                            st.session_state.page = (
-                                "confirmation"
-                            )
-
-                            st.rerun()
-
-                    except Exception as e:
-
-                        st.error(
-                            f"Could not place order: {e}"
-                        )
+                    st.error(
+                        f"Could not place order: {e}"
+                    )
 
 
 # =========================================================
-# CONFIRMATION PAGE
+# CONFIRMATION
 # =========================================================
 
 def confirmation_page():
@@ -950,7 +1057,9 @@ def confirmation_page():
     order = st.session_state.last_order
 
     st.markdown(
-        '<div class="main-title">🎉 Order Confirmed!</div>',
+        '<div class="main-title">'
+        '🎉 Order Confirmed!'
+        '</div>',
         unsafe_allow_html=True
     )
 
@@ -962,11 +1071,8 @@ def confirmation_page():
         )
 
         st.markdown(
-            "### 🎫 Show this Order ID at the "
-            "cafeteria counter."
+            "### 🎫 Show this Order ID at the cafeteria counter."
         )
-
-        st.divider()
 
         c1, c2, c3 = st.columns(3)
 
@@ -981,7 +1087,7 @@ def confirmation_page():
 
             st.metric(
                 "Total",
-                f"₹{order['total']}"
+                f"₹{order['total']:.0f}"
             )
 
         with c3:
@@ -993,7 +1099,9 @@ def confirmation_page():
 
         st.divider()
 
-        st.subheader("📋 Order Summary")
+        st.subheader(
+            "📋 Order Summary"
+        )
 
         st.write(
             f"**Student:** "
@@ -1012,116 +1120,56 @@ def confirmation_page():
                 f"{order['break_time']}"
             )
 
-        if order.get("regular_source"):
+        if order["order_type"] == "Regular Order":
 
-            st.write(
-                f"**Order source:** "
-                f"{order['regular_source']}"
+            st.success(
+                "⏱️ Expected preparation time: "
+                "approximately 10–15 minutes."
             )
 
         st.divider()
-
-        st.subheader("🍽️ Items")
 
         for item, quantity in (
             order["items"].items()
         ):
 
-            price = (
-                MENU[item]["price"] *
-                quantity
-            )
-
             st.write(
-                f"**{item}** × {quantity} — ₹{price}"
-            )
-
-        st.divider()
-
-        if order["order_type"] == "Break Order":
-
-            st.info(
-                "🕐 Collect your order during "
-                f"**{order['break_time']}**."
-            )
-
-        else:
-
-            st.success(
-                "⏱️ Your order should be ready "
-                "in approximately **10–15 minutes**."
-            )
-
-            st.info(
-                "📦 Please collect it from the "
-                "cafeteria counter using Order ID "
-                f"**#{order['order_id']}**."
-            )
-
-        st.divider()
-
-        # SIMPLE STATUS JOURNEY
-
-        st.subheader("📍 Order Journey")
-
-        if order["order_type"] == "Break Order":
-
-            st.write(
-                "🟡 **Confirmed**  →  "
-                "🎫 **Collect during break**"
-            )
-
-        else:
-
-            st.write(
-                "🟡 **Confirmed**  →  "
-                "🔵 **Preparing**  →  "
-                "🟢 **Ready**  →  "
-                "🎫 **Collected**"
+                f"**{item}** × {quantity}"
             )
 
     st.divider()
 
-    c1, c2 = st.columns(2)
+    if st.button(
+        "🔎 Track This Order",
+        use_container_width=True
+    ):
 
-    with c1:
+        st.session_state.page = "track"
 
-        if st.button(
-            "🍔 Place Another Order",
-            use_container_width=True
-        ):
+        st.rerun()
 
-            st.session_state.page = "student"
+    if st.button(
+        "🏠 Return to Home",
+        type="primary",
+        use_container_width=True
+    ):
 
-            st.rerun()
+        st.session_state.page = "home"
 
-    with c2:
-
-        if st.button(
-            "🏠 Return to Home",
-            type="primary",
-            use_container_width=True
-        ):
-
-            st.session_state.page = "home"
-
-            st.rerun()
+        st.rerun()
 
 
 # =========================================================
-# TRACK ORDER PAGE
+# TRACK ORDER
 # =========================================================
 
 def track_order_page():
 
     st.markdown(
-        '<div class="main-title">🔎 Track My Order</div>',
+        '<div class="main-title">'
+        '🔎 Track My Order'
+        '</div>',
         unsafe_allow_html=True
-    )
-
-    st.write(
-        "Enter your Order ID and Student ID "
-        "to see the latest status."
     )
 
     order_id = st.text_input(
@@ -1130,8 +1178,7 @@ def track_order_page():
     ).strip()
 
     student_id = st.text_input(
-        "Student ID",
-        placeholder="Enter your Student ID"
+        "Student ID"
     ).strip()
 
     if st.button(
@@ -1143,13 +1190,7 @@ def track_order_page():
         if not order_id or not student_id:
 
             st.warning(
-                "Please enter both Order ID and Student ID."
-            )
-
-        elif db is None:
-
-            st.error(
-                "Firebase is not connected."
+                "Please enter both fields."
             )
 
         else:
@@ -1158,23 +1199,25 @@ def track_order_page():
 
                 found = None
 
-                orders_ref = (
+                docs = (
                     db.collection("orders")
                     .stream()
                 )
 
-                for doc in orders_ref:
+                for doc in docs:
 
                     data = doc.to_dict()
 
                     if (
                         str(
                             data.get("order_id")
-                        ) == order_id
+                        )
+                        == order_id
                         and
                         str(
                             data.get("student_id")
-                        ) == student_id
+                        )
+                        == student_id
                     ):
 
                         found = data
@@ -1195,7 +1238,7 @@ def track_order_page():
                     )
 
                     st.success(
-                        f"Order **#{order_id}** found."
+                        f"Order #{order_id} found."
                     )
 
                     st.metric(
@@ -1203,61 +1246,29 @@ def track_order_page():
                         status
                     )
 
-                    st.write(
-                        f"**Student:** "
-                        f"{found.get('student_name')}"
-                    )
-
-                    st.write(
-                        f"**Total:** "
-                        f"₹{found.get('total')}"
-                    )
-
-                    st.write(
-                        f"**Order Type:** "
-                        f"{found.get('order_type')}"
-                    )
-
-                    st.divider()
-
-                    if (
-                        found.get("order_type")
-                        == "Break Order"
-                    ):
+                    if status == "Confirmed":
 
                         st.info(
-                            "🎫 Confirmed for your "
-                            "selected break. "
-                            "Please collect using "
-                            f"Order ID **#{order_id}**."
-                        )
-
-                    elif status == "Confirmed":
-
-                        st.warning(
-                            "🟡 Your order has been confirmed "
-                            "and will be prepared shortly."
+                            "🟡 Order confirmed."
                         )
 
                     elif status == "Preparing":
 
                         st.info(
-                            "🔵 Your food is being prepared."
+                            "🔵 Food is being prepared."
                         )
 
                     elif status == "Ready":
 
                         st.success(
-                            "🟢 Your order is ready! "
-                            "Please collect it from the "
-                            "cafeteria counter."
+                            "🟢 Your order is ready "
+                            "for collection!"
                         )
 
                     elif status == "Collected":
 
                         st.success(
-                            "⚫ Order collected. "
-                            "Enjoy your food!"
+                            "⚫ Order collected. Enjoy!"
                         )
 
             except Exception as e:
@@ -1280,41 +1291,217 @@ def track_order_page():
 
 
 # =========================================================
-# UPDATE ORDER STATUS
+# MENU MANAGEMENT
 # =========================================================
 
-def update_order_status(
-    doc_id,
-    new_status
-):
+def menu_management():
 
-    try:
+    st.subheader(
+        "🍽️ Menu Management"
+    )
 
-        db.collection(
-            "orders"
-        ).document(
-            doc_id
-        ).update(
-            {
-                "status":
-                    new_status,
+    menu = load_menu()
 
-                "updated_at":
-                    datetime.now(
-                        ZoneInfo(
-                            "Asia/Kolkata"
+    st.markdown(
+        "### ➕ Add New Item"
+    )
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+
+        new_name = st.text_input(
+            "Item Name",
+            key="new_item_name"
+        )
+
+    with c2:
+
+        new_price = st.number_input(
+            "Price ₹",
+            min_value=1.0,
+            step=1.0,
+            key="new_item_price"
+        )
+
+    with c3:
+
+        new_emoji = st.text_input(
+            "Emoji",
+            value="🍽️",
+            key="new_item_emoji"
+        )
+
+    if st.button(
+        "➕ Add Item",
+        use_container_width=True
+    ):
+
+        clean_name = new_name.strip()
+
+        if not clean_name:
+
+            st.error(
+                "Enter an item name."
+            )
+
+        elif clean_name in menu:
+
+            st.error(
+                "This item already exists."
+            )
+
+        else:
+
+            db.collection(
+                "menu"
+            ).document(
+                clean_name
+            ).set(
+                {
+                    "price":
+                        new_price,
+
+                    "discount":
+                        0,
+
+                    "available":
+                        True,
+
+                    "emoji":
+                        new_emoji
+                }
+            )
+
+            st.success(
+                f"{clean_name} added to menu."
+            )
+
+            st.rerun()
+
+    st.divider()
+
+    st.markdown(
+        "### ✏️ Manage Existing Items"
+    )
+
+    for item, data in menu.items():
+
+        with st.container(
+            border=True
+        ):
+
+            c1, c2, c3, c4 = st.columns(
+                [3, 2, 2, 2]
+            )
+
+            with c1:
+
+                st.markdown(
+                    f"### "
+                    f"{data.get('emoji', '🍽️')} "
+                    f"{item}"
+                )
+
+            with c2:
+
+                new_price = st.number_input(
+                    "Price",
+                    min_value=1.0,
+                    value=float(
+                        data.get(
+                            "price",
+                            0
                         )
+                    ),
+                    key=f"price_{item}"
+                )
+
+            with c3:
+
+                new_discount = st.number_input(
+                    "Discount %",
+                    min_value=0.0,
+                    max_value=90.0,
+                    value=float(
+                        data.get(
+                            "discount",
+                            0
+                        )
+                    ),
+                    step=5.0,
+                    key=f"discount_{item}"
+                )
+
+            with c4:
+
+                available = st.checkbox(
+                    "Available",
+                    value=data.get(
+                        "available",
+                        True
+                    ),
+                    key=f"available_{item}"
+                )
+
+            b1, b2 = st.columns(2)
+
+            with b1:
+
+                if st.button(
+                    "💾 Save Changes",
+                    key=f"save_{item}",
+                    use_container_width=True
+                ):
+
+                    db.collection(
+                        "menu"
+                    ).document(
+                        item
+                    ).update(
+                        {
+                            "price":
+                                new_price,
+
+                            "discount":
+                                new_discount,
+
+                            "available":
+                                available
+                        }
                     )
-            }
-        )
 
-        st.rerun()
+                    st.success(
+                        f"{item} updated."
+                    )
 
-    except Exception as e:
+                    st.rerun()
 
-        st.error(
-            f"Could not update order: {e}"
-        )
+            with b2:
+
+                if st.button(
+                    "🗑️ Remove Item",
+                    key=f"delete_{item}",
+                    use_container_width=True
+                ):
+
+                    db.collection(
+                        "menu"
+                    ).document(
+                        item
+                    ).delete()
+
+                    if item in st.session_state.cart:
+
+                        del st.session_state.cart[
+                            item
+                        ]
+
+                    st.success(
+                        f"{item} removed."
+                    )
+
+                    st.rerun()
 
 
 # =========================================================
@@ -1324,14 +1511,15 @@ def update_order_status(
 def cafeteria_page():
 
     st.markdown(
-        '<div class="main-title">👨‍🍳 Cafeteria Dashboard</div>',
+        '<div class="main-title">'
+        '👨‍🍳 Cafeteria Dashboard'
+        '</div>',
         unsafe_allow_html=True
     )
 
     if st.button(
         "🏠 Return to Home",
-        type="primary",
-        use_container_width=False
+        type="primary"
     ):
 
         st.session_state.page = "home"
@@ -1340,27 +1528,36 @@ def cafeteria_page():
 
     st.divider()
 
-    if firebase_connected:
-
-        st.success(
-            "🟢 Firebase connected successfully"
-        )
-
-    else:
+    if not firebase_connected:
 
         st.error(
-            "🔴 Firebase connection failed"
+            "Firebase connection failed."
         )
 
         return
 
-    # =====================================================
-    # LOAD TODAY'S ORDERS
-    # =====================================================
+    st.success(
+        "🟢 Firebase connected successfully"
+    )
 
-    today = datetime.now(
-        ZoneInfo("Asia/Kolkata")
-    ).strftime(
+    # -----------------------------------------------------
+    # MENU
+    # -----------------------------------------------------
+
+    with st.expander(
+        "🍽️ Manage Menu & Discounts",
+        expanded=False
+    ):
+
+        menu_management()
+
+    st.divider()
+
+    # -----------------------------------------------------
+    # LOAD ORDERS
+    # -----------------------------------------------------
+
+    today = current_india_time().strftime(
         "%Y-%m-%d"
     )
 
@@ -1368,12 +1565,12 @@ def cafeteria_page():
 
     try:
 
-        orders_ref = (
+        docs = (
             db.collection("orders")
             .stream()
         )
 
-        for doc in orders_ref:
+        for doc in docs:
 
             data = doc.to_dict()
 
@@ -1391,24 +1588,20 @@ def cafeteria_page():
 
         return
 
-    # =====================================================
+    # -----------------------------------------------------
     # METRICS
-    # =====================================================
+    # -----------------------------------------------------
 
     total_orders = len(orders)
 
-    confirmed = sum(
+    pending = sum(
         1
         for o in orders
         if o.get("status")
-        == "Confirmed"
-    )
-
-    preparing = sum(
-        1
-        for o in orders
-        if o.get("status")
-        == "Preparing"
+        in [
+            "Confirmed",
+            "Preparing"
+        ]
     )
 
     ready = sum(
@@ -1432,16 +1625,12 @@ def cafeteria_page():
         for o in orders
     )
 
-    st.subheader(
-        "📊 Today's Overview"
-    )
-
     m1, m2, m3, m4 = st.columns(4)
 
     with m1:
 
         st.metric(
-            "Total Orders",
+            "Today's Orders",
             total_orders
         )
 
@@ -1449,7 +1638,7 @@ def cafeteria_page():
 
         st.metric(
             "Pending",
-            confirmed + preparing
+            pending
         )
 
     with m3:
@@ -1462,54 +1651,28 @@ def cafeteria_page():
     with m4:
 
         st.metric(
-            "Today's Sales",
+            "Sales",
             f"₹{revenue:.0f}"
         )
 
+    # -----------------------------------------------------
+    # SEARCH
+    # -----------------------------------------------------
+
     st.divider()
-
-    # =====================================================
-    # BREAK RUSH INDICATOR
-    # =====================================================
-
-    if is_break_time():
-
-        st.warning(
-            "🚨 BREAK RUSH IS CURRENTLY ACTIVE"
-        )
-
-        st.caption(
-            "Prioritize Break Orders and keep "
-            "the collection counter moving quickly."
-        )
-
-    else:
-
-        st.info(
-            "🟢 Normal operating period"
-        )
-
-    # =====================================================
-    # FILTERS
-    # =====================================================
-
-    st.subheader(
-        "🔎 Find Orders"
-    )
 
     c1, c2 = st.columns(2)
 
     with c1:
 
-        search_id = st.text_input(
-            "Search Order ID",
-            placeholder="Example: 001"
+        search = st.text_input(
+            "🔎 Search Order ID"
         ).strip()
 
     with c2:
 
-        status_filter = st.selectbox(
-            "Status",
+        filter_status = st.selectbox(
+            "Filter Status",
             [
                 "All",
                 "Confirmed",
@@ -1519,41 +1682,50 @@ def cafeteria_page():
             ]
         )
 
-    filtered_orders = orders.copy()
+    filtered = orders.copy()
 
-    if search_id:
+    if search:
 
-        filtered_orders = [
+        filtered = [
+
             o
-            for o in filtered_orders
+
+            for o in filtered
+
             if str(
-                o.get("order_id", "")
-            ).lower()
-            == search_id.lower()
+                o.get(
+                    "order_id",
+                    ""
+                )
+            )
+            == search
         ]
 
-    if status_filter != "All":
+    if filter_status != "All":
 
-        filtered_orders = [
+        filtered = [
+
             o
-            for o in filtered_orders
-            if o.get("status")
-            == status_filter
+
+            for o in filtered
+
+            if o.get(
+                "status"
+            )
+            == filter_status
         ]
 
-    # Newest first
+    filtered.reverse()
 
-    filtered_orders.reverse()
-
-    # =====================================================
-    # ORDER LIST
-    # =====================================================
+    # -----------------------------------------------------
+    # ORDERS
+    # -----------------------------------------------------
 
     st.subheader(
-        f"🍽️ Orders ({len(filtered_orders)})"
+        f"🍽️ Today's Orders ({len(filtered)})"
     )
 
-    if not filtered_orders:
+    if not filtered:
 
         st.info(
             "No matching orders."
@@ -1561,12 +1733,7 @@ def cafeteria_page():
 
     else:
 
-        for order in filtered_orders:
-
-            order_id = order.get(
-                "order_id",
-                "---"
-            )
+        for order in filtered:
 
             status = order.get(
                 "status",
@@ -1577,26 +1744,6 @@ def cafeteria_page():
                 "order_type",
                 ""
             )
-
-            if status == "Confirmed":
-
-                icon = "🟡"
-
-            elif status == "Preparing":
-
-                icon = "🔵"
-
-            elif status == "Ready":
-
-                icon = "🟢"
-
-            elif status == "Collected":
-
-                icon = "⚫"
-
-            else:
-
-                icon = "⚪"
 
             with st.container(
                 border=True
@@ -1609,21 +1756,22 @@ def cafeteria_page():
                 with c1:
 
                     st.markdown(
-                        f"## #{order_id}"
+                        f"## "
+                        f"#{order.get('order_id')}"
                     )
 
                     st.write(
                         f"**Student:** "
-                        f"{order.get('student_name', '')}"
+                        f"{order.get('student_name')}"
                     )
 
                     st.write(
                         f"**Student ID:** "
-                        f"{order.get('student_id', '')}"
+                        f"{order.get('student_id')}"
                     )
 
                     st.write(
-                        f"**Order Type:** "
+                        f"**Type:** "
                         f"{order_type}"
                     )
 
@@ -1636,15 +1784,6 @@ def cafeteria_page():
                             f"{order.get('break_time')}"
                         )
 
-                    if order.get(
-                        "regular_source"
-                    ):
-
-                        st.write(
-                            f"**Source:** "
-                            f"{order.get('regular_source')}"
-                        )
-
                     st.write(
                         f"**Items:** "
                         f"{order.get('items')}"
@@ -1652,27 +1791,23 @@ def cafeteria_page():
 
                     st.write(
                         f"**Total:** "
-                        f"₹{order.get('total', 0)}"
+                        f"₹{order.get('total', 0):.0f}"
                     )
 
                 with c2:
 
                     st.markdown(
-                        f"### {icon} {status}"
+                        f"### "
+                        f"{status}"
                     )
 
-                    # -------------------------------------
                     # BREAK ORDER
-                    # -------------------------------------
-
-                    if (
-                        order_type
-                        == "Break Order"
-                    ):
+                    if order_type == "Break Order":
 
                         st.caption(
-                            "Break orders skip "
-                            "the preparation status."
+                            "Break order: "
+                            "no preparation-status "
+                            "updates required."
                         )
 
                         if status == "Confirmed":
@@ -1686,15 +1821,12 @@ def cafeteria_page():
                                 use_container_width=True
                             ):
 
-                                update_order_status(
+                                update_status(
                                     order["_doc_id"],
                                     "Collected"
                                 )
 
-                    # -------------------------------------
                     # REGULAR ORDER
-                    # -------------------------------------
-
                     else:
 
                         if status == "Confirmed":
@@ -1702,13 +1834,13 @@ def cafeteria_page():
                             if st.button(
                                 "▶ Start Preparing",
                                 key=(
-                                    "prepare_"
+                                    "start_"
                                     + order["_doc_id"]
                                 ),
                                 use_container_width=True
                             ):
 
-                                update_order_status(
+                                update_status(
                                     order["_doc_id"],
                                     "Preparing"
                                 )
@@ -1724,7 +1856,7 @@ def cafeteria_page():
                                 use_container_width=True
                             ):
 
-                                update_order_status(
+                                update_status(
                                     order["_doc_id"],
                                     "Ready"
                                 )
@@ -1740,14 +1872,14 @@ def cafeteria_page():
                                 use_container_width=True
                             ):
 
-                                update_order_status(
+                                update_status(
                                     order["_doc_id"],
                                     "Collected"
                                 )
 
-    # =====================================================
-    # FEEDBACK SECTION
-    # =====================================================
+    # -----------------------------------------------------
+    # FEEDBACK
+    # -----------------------------------------------------
 
     st.divider()
 
@@ -1759,13 +1891,13 @@ def cafeteria_page():
 
     try:
 
-        feedback_ref = (
+        docs = (
             db.collection(
                 "feedbacks"
             ).stream()
         )
 
-        for doc in feedback_ref:
+        for doc in docs:
 
             feedbacks.append(
                 doc.to_dict()
@@ -1773,12 +1905,12 @@ def cafeteria_page():
 
     except Exception:
 
-        feedbacks = []
+        pass
 
     if not feedbacks:
 
         st.info(
-            "No feedback submitted yet."
+            "No feedback yet."
         )
 
     else:
@@ -1786,87 +1918,92 @@ def cafeteria_page():
         ratings = [
 
             int(
-                f.get("rating", 0)
-            )
-
-            for f in feedbacks
-
-            if f.get("rating")
-        ]
-
-        if ratings:
-
-            average_rating = (
-                sum(ratings)
-                / len(ratings)
-            )
-
-            f1, f2, f3 = st.columns(3)
-
-            with f1:
-
-                st.metric(
-                    "Average Rating",
-                    f"{average_rating:.1f} ⭐"
-                )
-
-            with f2:
-
-                st.metric(
-                    "Responses",
-                    len(feedbacks)
-                )
-
-            with f3:
-
-                five_star = sum(
-                    1
-                    for r in ratings
-                    if r == 5
-                )
-
-                st.metric(
-                    "5-Star",
-                    five_star
-                )
-
-        st.markdown(
-            "### Recent Feedback"
-        )
-
-        for feedback in reversed(
-            feedbacks[-5:]
-        ):
-
-            rating = int(
-                feedback.get(
+                f.get(
                     "rating",
                     0
                 )
             )
 
-            comment = feedback.get(
-                "comment",
-                ""
+            for f in feedbacks
+
+            if f.get(
+                "rating"
+            )
+        ]
+
+        if ratings:
+
+            average = (
+                sum(ratings)
+                / len(ratings)
             )
 
-            order_id = feedback.get(
-                "order_id",
-                "---"
-            )
+            a, b = st.columns(2)
+
+            with a:
+
+                st.metric(
+                    "Average Rating",
+                    f"{average:.1f} ⭐"
+                )
+
+            with b:
+
+                st.metric(
+                    "Responses",
+                    len(ratings)
+                )
+
+        for feedback in reversed(
+            feedbacks[-5:]
+        ):
 
             st.write(
-                f"**Order #{order_id}** "
-                f"{'⭐' * rating}"
+                f"**Order #{feedback.get('order_id')}** "
+                f"{'⭐' * int(feedback.get('rating', 0))}"
             )
 
-            if comment:
+            if feedback.get("comment"):
 
                 st.write(
-                    f"_{comment}_"
+                    f"_{feedback.get('comment')}_"
                 )
 
             st.divider()
+
+
+# =========================================================
+# UPDATE STATUS
+# =========================================================
+
+def update_status(
+    doc_id,
+    status
+):
+
+    try:
+
+        db.collection(
+            "orders"
+        ).document(
+            doc_id
+        ).update(
+            {
+                "status":
+                    status,
+
+                "updated_at":
+                    current_india_time()
+            }
+        )
+
+        st.rerun()
+
+    except Exception as e:
+
+        st.error(
+            f"Could not update status: {e}"
+        )
 
 
 # =========================================================
@@ -1876,18 +2013,14 @@ def cafeteria_page():
 def feedback_page():
 
     st.markdown(
-        '<div class="main-title">⭐ Give Feedback</div>',
+        '<div class="main-title">'
+        '⭐ Feedback'
+        '</div>',
         unsafe_allow_html=True
     )
 
-    st.write(
-        "Your feedback helps the cafeteria "
-        "improve food and service."
-    )
-
     order_id = st.text_input(
-        "Order ID",
-        placeholder="Example: 001"
+        "Order ID"
     ).strip()
 
     rating = st.slider(
@@ -1897,36 +2030,31 @@ def feedback_page():
         5
     )
 
-    food_quality = st.select_slider(
+    food = st.select_slider(
         "Food Quality",
-        options=[
+        [
             "Poor",
             "Average",
             "Good",
             "Very Good",
             "Excellent"
-        ],
-        value="Good"
+        ]
     )
 
     service = st.select_slider(
         "Service",
-        options=[
+        [
             "Poor",
             "Average",
             "Good",
             "Very Good",
             "Excellent"
-        ],
-        value="Good"
+        ]
     )
 
     comment = st.text_area(
         "Comments",
-        placeholder=(
-            "What did you like? "
-            "What can we improve?"
-        )
+        placeholder="Tell us what we can improve."
     )
 
     if st.button(
@@ -1938,21 +2066,15 @@ def feedback_page():
         if not order_id:
 
             st.error(
-                "Please enter your Order ID."
-            )
-
-        elif db is None:
-
-            st.error(
-                "Firebase is not connected."
+                "Please enter Order ID."
             )
 
         else:
 
-            try:
-
-                feedback_data = {
-
+            db.collection(
+                "feedbacks"
+            ).add(
+                {
                     "order_id":
                         order_id,
 
@@ -1960,7 +2082,7 @@ def feedback_page():
                         rating,
 
                     "food_quality":
-                        food_quality,
+                        food,
 
                     "service":
                         service,
@@ -1969,29 +2091,13 @@ def feedback_page():
                         comment.strip(),
 
                     "created_at":
-                        datetime.now(
-                            ZoneInfo(
-                                "Asia/Kolkata"
-                            )
-                        )
+                        current_india_time()
                 }
+            )
 
-                db.collection(
-                    "feedbacks"
-                ).add(
-                    feedback_data
-                )
-
-                st.success(
-                    "Thank you! Your feedback "
-                    "has been recorded. ⭐"
-                )
-
-            except Exception as e:
-
-                st.error(
-                    f"Could not submit feedback: {e}"
-                )
+            st.success(
+                "Thank you for your feedback! ⭐"
+            )
 
     st.divider()
 
@@ -2007,7 +2113,7 @@ def feedback_page():
 
 
 # =========================================================
-# PAGE ROUTING
+# ROUTING
 # =========================================================
 
 if st.session_state.page == "home":
