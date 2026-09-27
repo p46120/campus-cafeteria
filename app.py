@@ -2485,13 +2485,24 @@ def cafeteria_dashboard_page():
 
             with c3:
 
-                item_text = ", ".join(
-                    f"{x['name']} × {x['quantity']}"
-                    for x in order.get(
-                        "items",
-                        []
-                    )
-                )
+                raw_items = order.get("items", [])
+
+if isinstance(raw_items, dict):
+    item_text = ", ".join(
+        f"{name} × {quantity}"
+        for name, quantity in raw_items.items()
+    )
+elif isinstance(raw_items, list):
+    item_text = ", ".join(
+        (
+            f"{x.get('name', 'Item')} × {x.get('quantity', 1)}"
+            if isinstance(x, dict)
+            else str(x)
+        )
+        for x in raw_items
+    )
+else:
+    item_text = str(raw_items)
 
                 st.write(
                     item_text
