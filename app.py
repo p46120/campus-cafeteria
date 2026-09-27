@@ -28,18 +28,16 @@ st.set_page_config(
 
 CAFETERIA_NAME = "Campus Cafeteria"
 
-# Cafeteria login
 CAFETERIA_LOGIN_ID = "cafeteria"
 CAFETERIA_PASSWORD = "Campus@123"
 
-# Cafeteria desk
 DESK_NAME = "Rahul"
 DESK_PHONE = "9065334992"
 DESK_EMAIL = "rahulraj1244raj@gmail.com"
 
 
 # ============================================================
-# BREAK TIMES
+# BREAK OPTIONS
 # ============================================================
 
 BREAK_OPTIONS = [
@@ -69,7 +67,7 @@ DEFAULT_MENU = [
     },
     {
         "name": "Maggi",
-        "price": 40,
+        "price": 35,
         "available": True,
         "discount": 0,
         "popular": True,
@@ -100,7 +98,7 @@ DEFAULT_MENU = [
         "image": "",
     },
     {
-        "name": "Coffee",
+        "name": "Cold Coffee",
         "price": 30,
         "available": True,
         "discount": 0,
@@ -108,6 +106,26 @@ DEFAULT_MENU = [
         "image": "",
     },
 ]
+
+
+# ============================================================
+# LEGACY MENU NAME FIX
+# ============================================================
+#
+# These are the random Firestore IDs visible in your screenshot.
+# They will no longer be displayed as food names.
+#
+# If a document already has a "name" field, that real name
+# always takes priority.
+#
+# ============================================================
+
+LEGACY_MENU_NAME_MAP = {
+    "4u3FCDLEIKKmeQcLXdnW": "Veg Roll",
+    "Ulp0Yd6IZvOYMRxUeRof": "Maggi",
+    "0z3xzZZH7Yajbkpa03fb": "Tea",
+    "pI7CfsYLvEocPU1n2RTx": "Sandwich",
+}
 
 
 # ============================================================
@@ -128,8 +146,6 @@ st.markdown(
     padding-bottom: 3rem;
 }
 
-/* HERO */
-
 .hero {
     background: linear-gradient(
         135deg,
@@ -140,7 +156,6 @@ st.markdown(
 
     border: 1px solid #e5e7eb;
     border-radius: 24px;
-
     padding: 2.4rem 2.6rem;
     margin: 1rem 0 2rem 0;
 
@@ -160,8 +175,6 @@ st.markdown(
     color: #6b7280;
     margin: 0;
 }
-
-/* CARDS */
 
 .card {
     background: #ffffff;
@@ -186,8 +199,6 @@ st.markdown(
     margin: 0;
 }
 
-/* SUCCESS */
-
 .success-box {
     background: #ecfdf5;
     border: 1px solid #a7f3d0;
@@ -195,8 +206,6 @@ st.markdown(
     padding: 1.1rem 1.3rem;
     margin-bottom: 1rem;
 }
-
-/* LOGIN */
 
 .login-box {
     background: white;
@@ -206,8 +215,6 @@ st.markdown(
     margin-bottom: 1rem;
 }
 
-/* METRICS */
-
 div[data-testid="stMetric"] {
     background: #ffffff;
     border: 1px solid #e5e7eb;
@@ -215,15 +222,11 @@ div[data-testid="stMetric"] {
     padding: 12px;
 }
 
-/* BUTTONS */
-
 .stButton > button {
     border-radius: 12px;
     min-height: 42px;
     font-weight: 600;
 }
-
-/* REMOVE EXCESS TOP SPACE */
 
 [data-testid="stHeader"] {
     background: transparent;
@@ -240,11 +243,6 @@ div[data-testid="stMetric"] {
 # ============================================================
 
 def render_html(html):
-    """
-    Render HTML properly.
-    This prevents HTML tags from appearing as
-    visible <h1>, <p>, <h3> text.
-    """
 
     if hasattr(st, "html"):
         st.html(html)
@@ -319,7 +317,7 @@ def get_web_api_key():
 
 
 # ============================================================
-# IMAGE HELPERS
+# IMAGE CONVERSION
 # ============================================================
 
 def image_to_data_url(
@@ -368,7 +366,7 @@ def image_to_data_url(
 
 
 # ============================================================
-# FIREBASE AUTH REST
+# FIREBASE AUTH
 # ============================================================
 
 def auth_request(
@@ -604,7 +602,6 @@ def get_user_profile(uid):
     )
 
     if snap.exists:
-
         return snap.to_dict()
 
     return None
@@ -662,6 +659,7 @@ def load_menu():
         .stream()
     )
 
+    # If no menu exists, create the standard menu.
     if not docs:
 
         for item in DEFAULT_MENU:
@@ -672,7 +670,7 @@ def load_menu():
                 item["name"]
             ).set(item)
 
-        return DEFAULT_MENU
+        return DEFAULT_MENU.copy()
 
     menu = []
 
@@ -680,7 +678,50 @@ def load_menu():
 
         item = doc.to_dict()
 
-        item["name"] = doc.id
+        # ----------------------------------------------------
+        # IMPORTANT FIX
+        # ----------------------------------------------------
+        #
+        # 1. If "name" exists, use it.
+        # 2. If old document has no name, check the known
+        #    legacy ID map.
+        # 3. Never display a random Firestore ID to students.
+        #
+        # ----------------------------------------------------
+
+        stored_name = str(
+            item.get(
+                "name",
+                ""
+            )
+        ).strip()
+
+        if stored_name:
+
+            food_name = stored_name
+
+        elif doc.id in LEGACY_MENU_NAME_MAP:
+
+            food_name = LEGACY_MENU_NAME_MAP[
+                doc.id
+            ]
+
+            # Save the real name into Firestore
+            # so the correction remains permanent.
+            doc.reference.set(
+                {
+                    "name": food_name
+                },
+                merge=True,
+            )
+
+        else:
+
+            # For any other old unnamed document,
+            # don't expose the technical Firestore ID.
+            food_name = "Food Item"
+
+        item["name"] = food_name
 
         item.setdefault(
             "price",
@@ -706,6 +747,9 @@ def load_menu():
             "image",
             "",
         )
+
+        # Keep actual Firestore reference internally.
+        item["_doc_id"] = doc.id
 
         menu.append(item)
 
@@ -751,7 +795,10 @@ def save_menu_item(
     image="",
 ):
 
+    name = name.strip()
+
     data = {
+        "name": name,
         "price": float(price),
         "discount": float(discount),
         "available": bool(available),
@@ -759,9 +806,10 @@ def save_menu_item(
     }
 
     if image:
-
         data["image"] = image
 
+    # New food items now use the actual food name
+    # as the Firestore document ID.
     db.collection(
         "menu"
     ).document(
@@ -773,14 +821,36 @@ def save_menu_item(
 
 
 def delete_menu_item(
-    name,
+    item,
 ):
 
-    db.collection(
-        "menu"
-    ).document(
-        name
-    ).delete()
+    # Prefer the real stored document ID.
+    doc_id = item.get(
+        "_doc_id"
+    )
+
+    if doc_id:
+
+        db.collection(
+            "menu"
+        ).document(
+            doc_id
+        ).delete()
+
+        return
+
+    name = item.get(
+        "name",
+        "",
+    )
+
+    if name:
+
+        db.collection(
+            "menu"
+        ).document(
+            name
+        ).delete()
 
 
 # ============================================================
@@ -843,15 +913,12 @@ def generate_daily_order_id():
 
 
 # ============================================================
-# ORDER ITEM COMPATIBILITY
+# ORDER HELPERS
 # ============================================================
 
 def normalize_order_items(
     items,
 ):
-
-    # Old format:
-    # {"Veg Roll": 1, "Tea": 1}
 
     if isinstance(
         items,
@@ -874,9 +941,6 @@ def normalize_order_items(
             )
 
         return result
-
-    # New format:
-    # [{"name": "...", "quantity": 1}]
 
     if isinstance(
         items,
@@ -930,8 +994,6 @@ def find_order_document(
         date.today().isoformat(),
     )
 
-    # New document format
-
     new_ref = (
         db.collection("orders")
         .document(
@@ -942,8 +1004,6 @@ def find_order_document(
     if new_ref.get().exists:
 
         return new_ref
-
-    # Old document format
 
     query = (
         db.collection("orders")
@@ -1774,7 +1834,7 @@ def render_navigation():
 
 
 # ============================================================
-# HOME PAGE
+# HOME
 # ============================================================
 
 def home_page():
@@ -1875,9 +1935,10 @@ def home_page():
 
         cols = st.columns(3)
 
-        for i, (title, description) in enumerate(
-            cards
-        ):
+        for i, (
+            title,
+            description,
+        ) in enumerate(cards):
 
             with cols[i]:
 
@@ -2028,8 +2089,6 @@ def student_login_page():
         ]
     )
 
-    # LOGIN
-
     with login_tab:
 
         email = st.text_input(
@@ -2103,8 +2162,6 @@ def student_login_page():
                             "Authentication worked, "
                             "but student profile was not found."
                         )
-
-    # SIGNUP
 
     with signup_tab:
 
@@ -2211,8 +2268,6 @@ def student_login_page():
 
                     st.rerun()
 
-    # RESET
-
     with reset_tab:
 
         email = st.text_input(
@@ -2299,7 +2354,7 @@ def order_food_page():
         return
 
     # ========================================================
-    # POPULAR
+    # POPULAR PICKS
     # ========================================================
 
     popular_items = [
@@ -2314,7 +2369,7 @@ def order_food_page():
     if popular_items:
 
         st.markdown(
-            "### ⭐ Popular Picks"
+            "## ⭐ Popular Picks"
         )
 
         cols = st.columns(
@@ -2331,29 +2386,33 @@ def order_food_page():
 
             with col:
 
-                if item.get(
-                    "image"
+                with st.container(
+                    border=True
                 ):
 
-                    st.image(
-                        item["image"],
-                        use_container_width=True,
+                    if item.get(
+                        "image"
+                    ):
+
+                        st.image(
+                            item["image"],
+                            use_container_width=True,
+                        )
+
+                    st.markdown(
+                        f"### {item['name']}"
                     )
 
-                st.markdown(
-                    f"**{item['name']}**"
-                )
-
-                st.write(
-                    f"₹{effective_price(item):.0f}"
-                )
+                    st.write(
+                        f"₹{effective_price(item):.0f}"
+                    )
 
     # ========================================================
     # MENU
     # ========================================================
 
     st.markdown(
-        "### Menu"
+        "## Menu"
     )
 
     cols = st.columns(2)
@@ -2379,6 +2438,10 @@ def order_food_page():
                         use_container_width=True,
                     )
 
+                st.markdown(
+                    f"### {item['name']}"
+                )
+
                 price = effective_price(
                     item
                 )
@@ -2400,10 +2463,6 @@ def order_food_page():
                 if discount > 0:
 
                     st.markdown(
-                        f"### {item['name']}"
-                    )
-
-                    st.markdown(
                         f"~~₹{old_price:.0f}~~ "
                         f"**₹{price:.0f}**"
                     )
@@ -2413,10 +2472,6 @@ def order_food_page():
                     )
 
                 else:
-
-                    st.markdown(
-                        f"### {item['name']}"
-                    )
 
                     st.markdown(
                         f"**₹{price:.0f}**"
@@ -2483,7 +2538,7 @@ def order_food_page():
     total = 0
 
     st.markdown(
-        "### 🛒 Your Cart"
+        "## 🛒 Your Cart"
     )
 
     for name, quantity in cart.items():
@@ -2520,7 +2575,7 @@ def order_food_page():
     # ========================================================
 
     st.markdown(
-        "### Choose Order Type"
+        "## Choose Order Type"
     )
 
     order_type = st.radio(
@@ -2561,7 +2616,7 @@ def order_food_page():
     # ========================================================
 
     st.markdown(
-        "### 💳 Payment"
+        "## 💳 Payment"
     )
 
     wallet_balance = float(
@@ -2602,8 +2657,8 @@ def order_food_page():
     else:
 
         st.info(
-            "You will pay at the cafeteria desk "
-            "when collecting your order."
+            "Pay at the cafeteria desk when "
+            "collecting your order."
         )
 
     # ========================================================
@@ -2885,7 +2940,7 @@ def my_orders_page():
             with c3:
 
                 st.write(
-                    f"**{order.get('status', '-') }**"
+                    f"**{order.get('status', '-')}**"
                 )
 
             with c4:
@@ -2901,7 +2956,7 @@ def my_orders_page():
 
 
 # ============================================================
-# STUDENT WALLET
+# WALLET
 # ============================================================
 
 def wallet_page():
@@ -3110,9 +3165,6 @@ def cafeteria_login_page():
         use_container_width=True,
     ):
 
-        # Login ID is case-insensitive.
-        # Password remains case-sensitive.
-
         if (
             login_id.strip().lower()
             == CAFETERIA_LOGIN_ID.lower()
@@ -3205,8 +3257,6 @@ def cafeteria_dashboard_page():
         )
         == "Collected"
     )
-
-    # Clean native Streamlit metrics
 
     c1, c2, c3, c4, c5 = st.columns(5)
 
@@ -3334,7 +3384,7 @@ def cafeteria_dashboard_page():
             with top2:
 
                 st.write(
-                    f"**{order.get('student_name', '-') }**"
+                    f"**{order.get('student_name', '-')}**"
                 )
 
                 st.caption(
@@ -3398,9 +3448,7 @@ def cafeteria_dashboard_page():
                     f"{payment_method}"
                 )
 
-            # ============================================
             # PAYMENT
-            # ============================================
 
             if (
                 payment_method
@@ -3435,9 +3483,7 @@ def cafeteria_dashboard_page():
                             error
                         )
 
-            # ============================================
             # REGULAR ORDER
-            # ============================================
 
             if (
                 order_type
@@ -3533,9 +3579,7 @@ def cafeteria_dashboard_page():
                                     error
                                 )
 
-            # ============================================
             # BREAK ORDER
-            # ============================================
 
             else:
 
@@ -3580,7 +3624,7 @@ def cafeteria_dashboard_page():
 
 
 # ============================================================
-# CAFETERIA WALLET MANAGEMENT
+# WALLET MANAGEMENT
 # ============================================================
 
 def wallet_management_page():
@@ -3865,11 +3909,11 @@ def menu_management_page():
 
                 if st.button(
                     "Delete",
-                    key=f"delete_{item['name']}",
+                    key=f"delete_{item.get('_doc_id', item['name'])}",
                 ):
 
                     delete_menu_item(
-                        item["name"]
+                        item
                     )
 
                     st.rerun()
