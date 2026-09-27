@@ -21,37 +21,33 @@ st.set_page_config(
 
 
 # =========================================================
-# CUSTOM CSS
+# APP STYLE
 # =========================================================
 
-st.markdown("""
+st.markdown(
+    """
 <style>
 
 .stApp {
-    background: #f7f9fc;
+    background-color: #f7f9fc;
 }
 
-/* Sidebar */
 section[data-testid="stSidebar"] {
-    background: #eef3f8;
+    background-color: #eef3f8;
 }
 
-/* Headings */
+/* Main headers */
 h1, h2, h3 {
     color: #29384d;
 }
 
-/* Main portal header */
-.portal-header {
-    background: linear-gradient(
-        135deg,
-        #eaf2fb,
-        #f5f8fb
-    );
-    border: 1px solid #dce5ef;
+/* Portal header */
+.portal-box {
+    background-color: #edf4fb;
+    border: 1px solid #dbe7f2;
     border-radius: 18px;
-    padding: 24px;
-    margin-bottom: 22px;
+    padding: 22px;
+    margin-bottom: 20px;
 }
 
 .portal-title {
@@ -61,125 +57,67 @@ h1, h2, h3 {
 }
 
 .portal-subtitle {
-    color: #718096;
+    color: #6b7b8c;
     margin-top: 5px;
 }
 
-/* General card */
-.soft-card {
-    background: white;
-    border: 1px solid #e4e9ef;
+/* Soft cards */
+.soft-box {
+    background-color: white;
+    border: 1px solid #e3e8ef;
     border-radius: 16px;
     padding: 20px;
     margin-bottom: 15px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
-/* Order card */
-.order-card {
-    background: white;
-    border: 1px solid #e2e8f0;
+/* Streamlit metric cards */
+div[data-testid="stMetric"] {
+    background-color: white;
+    border: 1px solid #e1e7ee;
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+div[data-testid="stMetricLabel"] {
+    color: #718096;
+}
+
+div[data-testid="stMetricValue"] {
+    color: #29384d;
+}
+
+/* Order cards */
+.order-box {
+    background-color: white;
+    border: 1px solid #e1e7ee;
     border-radius: 16px;
     padding: 18px;
     margin-bottom: 15px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
-/* Metric card */
-.metric-box {
-    background: white;
-    border-radius: 16px;
-    padding: 18px;
-    border: 1px solid #e1e7ee;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    text-align: center;
-}
-
-.metric-icon {
-    font-size: 25px;
-}
-
-.metric-label {
-    color: #718096;
-    font-size: 14px;
-    margin-top: 4px;
-}
-
-.metric-number {
-    color: #26364a;
-    font-size: 30px;
-    font-weight: 700;
-    margin-top: 4px;
-}
-
 /* Labels */
 .break-label {
-    display: inline-block;
-    background: #f0ebff;
+    background-color: #f0ebff;
     color: #6b4bb3;
-    padding: 5px 11px;
-    border-radius: 18px;
+    padding: 5px 10px;
+    border-radius: 15px;
     font-weight: 600;
-    font-size: 13px;
 }
 
 .regular-label {
-    display: inline-block;
-    background: #e8f6f4;
+    background-color: #e7f6f3;
     color: #28786f;
-    padding: 5px 11px;
-    border-radius: 18px;
-    font-weight: 600;
-    font-size: 13px;
-}
-
-/* Status */
-.status-confirmed {
-    color: #2468a8;
-    background: #eaf3ff;
     padding: 5px 10px;
     border-radius: 15px;
     font-weight: 600;
 }
 
-.status-preparing {
-    color: #a46700;
-    background: #fff3df;
-    padding: 5px 10px;
-    border-radius: 15px;
-    font-weight: 600;
-}
-
-.status-ready {
-    color: #20844a;
-    background: #e8f7ef;
-    padding: 5px 10px;
-    border-radius: 15px;
-    font-weight: 600;
-}
-
-.status-collected {
-    color: #69727d;
-    background: #edf0f3;
-    padding: 5px 10px;
-    border-radius: 15px;
-    font-weight: 600;
-}
-
-/* Popular */
 .popular-label {
-    color: #9a6b00;
-    background: #fff6d9;
-    padding: 4px 9px;
-    border-radius: 14px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-/* Out of stock */
-.stock-label {
-    color: #b33a3a;
-    background: #fdeaea;
+    background-color: #fff5d8;
+    color: #946c00;
     padding: 4px 9px;
     border-radius: 14px;
     font-size: 12px;
@@ -187,7 +125,9 @@ h1, h2, h3 {
 }
 
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True
+)
 
 
 # =========================================================
@@ -211,7 +151,6 @@ def init_firebase():
 
 
 try:
-
     db = init_firebase()
     firebase_ok = True
 
@@ -225,11 +164,19 @@ except Exception as e:
 
 
 # =========================================================
+# CAFETERIA CONTACT
+# =========================================================
+
+DESK_NAME = "Rahul"
+DESK_PHONE = "9065334992"
+DESK_EMAIL = "p46120@irma.ac.in"
+
+
+# =========================================================
 # DEFAULT MENU
 # =========================================================
 
 DEFAULT_MENU = {
-
     "Tea": {
         "price": 15,
         "emoji": "☕",
@@ -238,7 +185,6 @@ DEFAULT_MENU = {
         "popular": True,
         "image": None
     },
-
     "Sandwich": {
         "price": 40,
         "emoji": "🥪",
@@ -247,7 +193,6 @@ DEFAULT_MENU = {
         "popular": False,
         "image": None
     },
-
     "Maggi": {
         "price": 35,
         "emoji": "🍜",
@@ -256,7 +201,6 @@ DEFAULT_MENU = {
         "popular": True,
         "image": None
     },
-
     "Cold Coffee": {
         "price": 30,
         "emoji": "🥤",
@@ -265,7 +209,6 @@ DEFAULT_MENU = {
         "popular": False,
         "image": None
     },
-
     "Veg Roll": {
         "price": 45,
         "emoji": "🌯",
@@ -274,7 +217,6 @@ DEFAULT_MENU = {
         "popular": True,
         "image": None
     },
-
     "Water Bottle": {
         "price": 20,
         "emoji": "💧",
@@ -287,7 +229,37 @@ DEFAULT_MENU = {
 
 
 # =========================================================
-# IMAGE HELPERS
+# BREAK TIMES
+# =========================================================
+
+BREAK_OPTIONS = [
+    "10:30 AM – 11:00 AM",
+    "11:00 AM – 11:30 AM",
+    "12:30 PM – 2:00 PM",
+    "1:00 PM – 2:00 PM",
+    "3:30 PM – 4:00 PM",
+    "5:30 PM – 6:00 PM",
+    "7:30 PM – 8:00 PM",
+    "9:30 PM – 10:00 PM"
+]
+
+
+# =========================================================
+# SESSION STATE
+# =========================================================
+
+if "cart" not in st.session_state:
+    st.session_state.cart = {}
+
+if "page" not in st.session_state:
+    st.session_state.page = "Home"
+
+if "last_order" not in st.session_state:
+    st.session_state.last_order = None
+
+
+# =========================================================
+# IMAGE FUNCTIONS
 # =========================================================
 
 def image_to_base64(uploaded_file):
@@ -316,7 +288,7 @@ def image_to_base64(uploaded_file):
         return None
 
 
-def show_base64_image(image_data, width=120):
+def show_food_image(image_data, width=120):
 
     if not image_data:
         return False
@@ -340,7 +312,7 @@ def show_base64_image(image_data, width=120):
 
 
 # =========================================================
-# MENU FUNCTIONS
+# MENU
 # =========================================================
 
 def load_menu():
@@ -359,33 +331,12 @@ def load_menu():
             data = doc.to_dict()
 
             menu[doc.id] = {
-
                 "price": data.get("price", 0),
-
-                "emoji": data.get(
-                    "emoji",
-                    "🍽️"
-                ),
-
-                "discount": data.get(
-                    "discount",
-                    0
-                ),
-
-                "available": data.get(
-                    "available",
-                    True
-                ),
-
-                "popular": data.get(
-                    "popular",
-                    False
-                ),
-
-                "image": data.get(
-                    "image",
-                    None
-                )
+                "emoji": data.get("emoji", "🍽️"),
+                "discount": data.get("discount", 0),
+                "available": data.get("available", True),
+                "popular": data.get("popular", False),
+                "image": data.get("image", None)
             }
 
         if not menu:
@@ -423,30 +374,6 @@ def discounted_price(item):
         price * (1 - discount / 100),
         2
     )
-
-
-# =========================================================
-# BREAK TIMES
-# =========================================================
-
-BREAK_OPTIONS = [
-
-    "10:30 AM – 11:00 AM",
-
-    "11:00 AM – 11:30 AM",
-
-    "12:30 PM – 2:00 PM",
-
-    "1:00 PM – 2:00 PM",
-
-    "3:30 PM – 4:00 PM",
-
-    "5:30 PM – 6:00 PM",
-
-    "7:30 PM – 8:00 PM",
-
-    "9:30 PM – 10:00 PM"
-]
 
 
 # =========================================================
@@ -513,52 +440,57 @@ def generate_daily_order_id():
 
 def find_order_document(order):
 
-    """
-    Finds the actual Firestore document instead of assuming
-    the document ID.
-
-    This fixes the old-order problem such as #111240.
-    """
-
     order_id = str(
         order.get("order_id", "")
     )
 
-    date = order.get("date")
+    order_date = order.get(
+        "date"
+    )
 
-    # First try current naming convention
-    if date:
+    # First try the new document naming system
+    if order_date:
 
-        possible_id = f"{date}_{order_id}"
+        possible_id = (
+            f"{order_date}_{order_id}"
+        )
 
-        ref = (
+        reference = (
             db.collection("orders")
             .document(possible_id)
         )
 
         try:
 
-            if ref.get().exists:
-                return ref
+            if reference.get().exists:
+                return reference
 
         except Exception:
             pass
 
-    # If not found, search orders
+    # Search Firestore for old orders
     try:
 
-        docs = db.collection("orders").stream()
+        documents = (
+            db.collection("orders")
+            .stream()
+        )
 
-        for doc in docs:
+        for document in documents:
 
-            data = doc.to_dict()
+            data = document.to_dict()
 
             if str(
                 data.get("order_id", "")
             ) == order_id:
 
-                if not date or data.get("date") == date:
-                    return doc.reference
+                if (
+                    not order_date
+                    or data.get("date")
+                    == order_date
+                ):
+
+                    return document.reference
 
     except Exception:
         pass
@@ -577,29 +509,29 @@ def update_order_status(
 
     try:
 
-        order_ref = find_order_document(
-            order
+        order_reference = (
+            find_order_document(order)
         )
 
-        if order_ref is None:
+        if order_reference is None:
 
             st.error(
-                "Order document could not be found."
+                "Could not find this order in Firebase."
             )
 
             return
 
-        order_ref.update({
-
-            "status": new_status,
-
-            "updated_at":
-                firestore.SERVER_TIMESTAMP
-        })
+        order_reference.update(
+            {
+                "status": new_status,
+                "updated_at":
+                    firestore.SERVER_TIMESTAMP
+            }
+        )
 
         st.success(
             f"Order #{order.get('order_id')} "
-            f"marked as {new_status}."
+            f"is now {new_status}."
         )
 
         st.rerun()
@@ -612,56 +544,41 @@ def update_order_status(
 
 
 # =========================================================
-# SESSION STATE
-# =========================================================
-
-if "cart" not in st.session_state:
-    st.session_state.cart = {}
-
-if "page" not in st.session_state:
-    st.session_state.page = "Home"
-
-if "last_order" not in st.session_state:
-    st.session_state.last_order = None
-
-
-# =========================================================
 # HOME
 # =========================================================
 
 def home_page():
 
-    st.markdown("""
-    <div class="portal-header">
-
+    st.markdown(
+        """
+        <div class="portal-box">
         <div class="portal-title">
-            🍽️ Campus Cafeteria
+        🍽️ Campus Cafeteria
         </div>
-
         <div class="portal-subtitle">
-            Fast ordering for students •
-            Simple management for cafeteria staff
+        Fast ordering for students • Simple management for cafeteria staff
         </div>
-
-    </div>
-    """, unsafe_allow_html=True)
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     col1, col2 = st.columns(2)
 
     with col1:
 
-        st.markdown("""
-        <div class="soft-card">
-
-        <h2>🎓 Student Portal</h2>
-
-        <p>
-        Pre-order your food and collect it
-        quickly from the cafeteria counter.
-        </p>
-
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="soft-box">
+            <h2>🎓 Student Portal</h2>
+            <p>
+            Pre-order your food and collect it
+            quickly from the cafeteria counter.
+            </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         if st.button(
             "🍴 Order Food",
@@ -674,18 +591,18 @@ def home_page():
 
     with col2:
 
-        st.markdown("""
-        <div class="soft-card">
-
-        <h2>📋 Cafeteria Portal</h2>
-
-        <p>
-        Manage orders, menu, availability,
-        popular items and feedback.
-        </p>
-
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="soft-box">
+            <h2>📋 Cafeteria Portal</h2>
+            <p>
+            Manage orders, menu, availability,
+            popular items and feedback.
+            </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         if st.button(
             "📋 Open Cafeteria Portal",
@@ -707,7 +624,7 @@ def home_page():
 
     with col2:
         st.success(
-            "📱 **Track order**\n\n"
+            "📱 **Track your order**\n\n"
             "See preparation status."
         )
 
@@ -719,7 +636,7 @@ def home_page():
 
 
 # =========================================================
-# STUDENT PAGE
+# STUDENT PORTAL
 # =========================================================
 
 def student_page():
@@ -731,7 +648,9 @@ def student_page():
     if st.button("← Back to Home"):
         go_home()
 
-    st.subheader("Choose Order Type")
+    st.subheader(
+        "Choose Order Type"
+    )
 
     order_type = st.radio(
         "",
@@ -756,24 +675,23 @@ def student_page():
 
     else:
 
-        st.markdown("""
-        <div class="soft-card">
-
-        <h3>🏠 Room / Hostel Pre-order</h3>
-
-        <p>
-        Order from your room or hostel.
-        The cafeteria will prepare it and
-        you can collect it from the counter.
-        </p>
-
-        <p>
-        ⏱️ Typical preparation time:
-        <b>10–15 minutes</b>
-        </p>
-
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="soft-box">
+            <h3>🏠 Room / Hostel Pre-order</h3>
+            <p>
+            Order from your room or hostel.
+            The cafeteria will prepare it and
+            you can collect it from the counter.
+            </p>
+            <p>
+            ⏱️ Typical preparation time:
+            <b>10–15 minutes</b>
+            </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         break_time = None
 
@@ -783,12 +701,13 @@ def student_page():
     # POPULAR PICKS
     # =====================================================
 
-    st.subheader("🔥 Popular Picks")
+    st.subheader(
+        "🔥 Popular Picks"
+    )
 
     popular_items = [
-
-        name for name, data in menu.items()
-
+        name
+        for name, data in menu.items()
         if data.get("available", True)
         and data.get("popular", False)
     ]
@@ -810,29 +729,28 @@ def student_page():
             ]:
 
                 st.markdown(
-                    '<div class="soft-card">',
+                    '<div class="soft-box">',
                     unsafe_allow_html=True
                 )
 
                 if item.get("image"):
 
-                    show_base64_image(
+                    show_food_image(
                         item["image"],
-                        width=130
+                        130
                     )
 
                 else:
 
                     st.markdown(
-                        f"<h1>{item.get('emoji', '🍽️')}</h1>",
-                        unsafe_allow_html=True
+                        f"## {item.get('emoji', '🍽️')}"
                     )
 
                 st.markdown(
                     f"**{item_name}**"
                 )
 
-                st.caption(
+                st.write(
                     f"₹{discounted_price(item):.0f}"
                 )
 
@@ -851,20 +769,17 @@ def student_page():
                         ) + 1
                     )
 
-                    st.success(
-                        "Added!"
-                    )
+                    st.success("Added!")
 
                 st.markdown(
-                    '</div>',
+                    "</div>",
                     unsafe_allow_html=True
                 )
 
     else:
 
         st.info(
-            "Cafeteria has not selected "
-            "popular items yet."
+            "No popular items selected yet."
         )
 
     # =====================================================
@@ -876,15 +791,9 @@ def student_page():
     st.subheader("🍴 Menu")
 
     available_items = {
-
         name: data
-
         for name, data in menu.items()
-
-        if data.get(
-            "available",
-            True
-        )
+        if data.get("available", True)
     }
 
     if not available_items:
@@ -905,16 +814,15 @@ def student_page():
 
             if item.get("image"):
 
-                show_base64_image(
+                show_food_image(
                     item["image"],
-                    width=85
+                    85
                 )
 
             else:
 
                 st.markdown(
-                    f"<h2>{item.get('emoji', '🍽️')}</h2>",
-                    unsafe_allow_html=True
+                    f"## {item.get('emoji', '🍽️')}"
                 )
 
         with col2:
@@ -975,9 +883,7 @@ def student_page():
                     ) + 1
                 )
 
-                st.success(
-                    "Added"
-                )
+                st.success("Added")
 
     # =====================================================
     # CART
@@ -985,7 +891,9 @@ def student_page():
 
     st.divider()
 
-    st.subheader("🛒 Your Cart")
+    st.subheader(
+        "🛒 Your Cart"
+    )
 
     if not st.session_state.cart:
 
@@ -1030,13 +938,11 @@ def student_page():
                 )
 
             with col2:
-
                 st.write(
                     f"₹{price:.0f}"
                 )
 
             with col3:
-
                 st.write(
                     f"x {quantity}"
                 )
@@ -1106,7 +1012,8 @@ def student_page():
 
                 order_data = {
 
-                    "order_id": order_id,
+                    "order_id":
+                        order_id,
 
                     "student_name":
                         student_name,
@@ -1175,18 +1082,9 @@ def confirmation_page():
         st.session_state.last_order
     )
 
-    st.markdown("""
-    <div class="soft-card"
-         style="text-align:center;">
-
-    <h1>🎉 Order Confirmed!</h1>
-
-    <p>
-    Your food order has been successfully placed.
-    </p>
-
-    </div>
-    """, unsafe_allow_html=True)
+    st.success(
+        "🎉 Your order has been confirmed!"
+    )
 
     st.metric(
         "Your Order ID",
@@ -1227,7 +1125,9 @@ def confirmation_page():
 
 def track_order_page():
 
-    st.title("📍 Track My Order")
+    st.title(
+        "📍 Track My Order"
+    )
 
     if st.button("← Back to Home"):
         go_home()
@@ -1256,19 +1156,18 @@ def track_order_page():
 
         try:
 
-            orders = (
+            documents = (
                 db.collection("orders")
                 .stream()
             )
 
             found = None
 
-            for doc in orders:
+            for document in documents:
 
-                data = doc.to_dict()
+                data = document.to_dict()
 
                 if (
-
                     str(
                         data.get(
                             "order_id",
@@ -1288,7 +1187,6 @@ def track_order_page():
                     )
                     ==
                     str(student_id)
-
                 ):
 
                     found = data
@@ -1307,41 +1205,23 @@ def track_order_page():
                 "Confirmed"
             )
 
-            st.markdown(
-                f"""
-                <div class="soft-card">
-
-                <h2>
-                Order #{found.get('order_id')}
-                </h2>
-
-                <p>
-                Student:
-                <b>{found.get('student_name')}</b>
-                </p>
-
-                <p>
-                Current Status:
-                <b>{status}</b>
-                </p>
-
-                </div>
-                """,
-                unsafe_allow_html=True
+            st.info(
+                f"Order #{found.get('order_id')} "
+                f"— {status}"
             )
 
             if found.get(
                 "order_type"
             ) == "Break Order":
 
-                if status == "Confirmed":
+                if status == "Collected":
 
                     st.success(
                         "🟢 Confirmed"
                     )
 
-                    st.info(
-                        "🎟️ Waiting for pickup"
+                    st.success(
+                        "✅ Collected"
                     )
 
                 else:
@@ -1350,8 +1230,8 @@ def track_order_page():
                         "🟢 Confirmed"
                     )
 
-                    st.success(
-                        "✅ Collected"
+                    st.info(
+                        "🎟️ Waiting for pickup"
                     )
 
             else:
@@ -1365,19 +1245,19 @@ def track_order_page():
 
                 if status in steps:
 
-                    current_index = (
-                        steps.index(status)
+                    current = steps.index(
+                        status
                     )
 
                 else:
 
-                    current_index = 0
+                    current = 0
 
                 for i, step in enumerate(
                     steps
                 ):
 
-                    if i <= current_index:
+                    if i <= current:
 
                         st.success(
                             f"● {step}"
@@ -1408,9 +1288,9 @@ def menu_management():
 
     menu = load_menu()
 
-    # =====================================================
-    # ADD ITEM
-    # =====================================================
+    # -----------------------------------------------------
+    # ADD NEW ITEM
+    # -----------------------------------------------------
 
     with st.expander(
         "➕ Add New Item",
@@ -1460,8 +1340,7 @@ def menu_management():
             )
 
         new_popular = st.checkbox(
-            "⭐ Mark as Popular",
-            value=False
+            "⭐ Show in Popular Picks"
         )
 
         if st.button(
@@ -1497,26 +1376,16 @@ def menu_management():
                     "menu"
                 ).document(
                     new_name
-                ).set({
-
-                    "price":
-                        new_price,
-
-                    "emoji":
-                        new_emoji,
-
-                    "discount":
-                        0,
-
-                    "available":
-                        True,
-
-                    "popular":
-                        new_popular,
-
-                    "image":
-                        image_data
-                })
+                ).set(
+                    {
+                        "price": new_price,
+                        "emoji": new_emoji,
+                        "discount": 0,
+                        "available": True,
+                        "popular": new_popular,
+                        "image": image_data
+                    }
+                )
 
                 st.success(
                     f"{new_name} added!"
@@ -1524,9 +1393,9 @@ def menu_management():
 
                 st.rerun()
 
-    # =====================================================
+    # -----------------------------------------------------
     # EXISTING ITEMS
-    # =====================================================
+    # -----------------------------------------------------
 
     st.divider()
 
@@ -1554,18 +1423,9 @@ def menu_management():
 
                 if item.get("image"):
 
-                    show_base64_image(
+                    show_food_image(
                         item["image"],
-                        width=120
-                    )
-
-                if item.get("popular"):
-
-                    st.markdown(
-                        '<span class="popular-label">'
-                        '⭐ Popular'
-                        '</span>',
-                        unsafe_allow_html=True
+                        120
                     )
 
             with col2:
@@ -1611,7 +1471,7 @@ def menu_management():
                 )
 
             popular = st.checkbox(
-                "⭐ Show in Popular Picks",
+                "⭐ Popular Picks",
                 value=item.get(
                     "popular",
                     False
@@ -1648,18 +1508,10 @@ def menu_management():
                 ):
 
                     update_data = {
-
-                        "price":
-                            price,
-
-                        "discount":
-                            discount,
-
-                        "available":
-                            available,
-
-                        "popular":
-                            popular
+                        "price": price,
+                        "discount": discount,
+                        "available": available,
+                        "popular": popular
                     }
 
                     if new_photo:
@@ -1725,22 +1577,18 @@ def load_today_orders():
 
     try:
 
-        docs = (
+        documents = (
             db.collection("orders")
             .stream()
         )
 
-        for doc in docs:
+        for document in documents:
 
-            data = doc.to_dict()
+            data = document.to_dict()
 
             if data.get(
                 "date"
             ) == today:
-
-                data["_doc_ref"] = (
-                    doc.reference
-                )
 
                 orders.append(data)
 
@@ -1788,7 +1636,7 @@ def render_order_card(
     )
 
     st.markdown(
-        '<div class="order-card">',
+        '<div class="order-box">',
         unsafe_allow_html=True
     )
 
@@ -1827,7 +1675,6 @@ def render_order_card(
         )
 
         item_text = " • ".join(
-
             [
                 f"{name} × {qty}"
                 for name, qty
@@ -1855,13 +1702,9 @@ def render_order_card(
 
     with col3:
 
-        st.markdown(
-            f"**Status:** {status}"
+        st.write(
+            f"**Status: {status}**"
         )
-
-        # -------------------------------------------------
-        # BREAK ORDER
-        # -------------------------------------------------
 
         if break_order:
 
@@ -1881,12 +1724,8 @@ def render_order_card(
             elif status == "Collected":
 
                 st.success(
-                    "✅ Order handed over"
+                    "✅ Handed over"
                 )
-
-        # -------------------------------------------------
-        # REGULAR ORDER
-        # -------------------------------------------------
 
         else:
 
@@ -1932,17 +1771,17 @@ def render_order_card(
             elif status == "Collected":
 
                 st.success(
-                    "✅ Order handed over"
+                    "✅ Handed over"
                 )
 
     st.markdown(
-        '</div>',
+        "</div>",
         unsafe_allow_html=True
     )
 
 
 # =========================================================
-# DATA CLEANUP
+# DATA CLEANUP - 14 DAYS
 # =========================================================
 
 def cleanup_old_data():
@@ -1950,10 +1789,6 @@ def cleanup_old_data():
     cutoff = (
         datetime.now()
         - timedelta(days=14)
-    )
-
-    cutoff_date = cutoff.strftime(
-        "%Y-%m-%d"
     )
 
     deleted_orders = 0
@@ -1965,14 +1800,14 @@ def cleanup_old_data():
 
     try:
 
-        orders = (
+        documents = (
             db.collection("orders")
             .stream()
         )
 
-        for doc in orders:
+        for document in documents:
 
-            data = doc.to_dict()
+            data = document.to_dict()
 
             date_text = data.get(
                 "date"
@@ -1991,7 +1826,7 @@ def cleanup_old_data():
 
                     if record_date < cutoff:
 
-                        doc.reference.delete()
+                        document.reference.delete()
 
                         deleted_orders += 1
 
@@ -2010,14 +1845,14 @@ def cleanup_old_data():
 
     try:
 
-        feedback_docs = (
+        documents = (
             db.collection("feedback")
             .stream()
         )
 
-        for doc in feedback_docs:
+        for document in documents:
 
-            data = doc.to_dict()
+            data = document.to_dict()
 
             date_text = data.get(
                 "date"
@@ -2036,7 +1871,7 @@ def cleanup_old_data():
 
                     if record_date < cutoff:
 
-                        doc.reference.delete()
+                        document.reference.delete()
 
                         deleted_feedback += 1
 
@@ -2056,7 +1891,7 @@ def cleanup_old_data():
 
 
 # =========================================================
-# DATA MANAGEMENT UI
+# DATA MANAGEMENT
 # =========================================================
 
 def data_management():
@@ -2066,13 +1901,12 @@ def data_management():
     )
 
     st.info(
-        "Order history and feedback older than "
-        "**14 days** can be removed to keep "
-        "the database clean."
+        "Orders and feedback older than "
+        "**14 days** can be removed."
     )
 
     st.warning(
-        "⚠️ Cleanup permanently deletes old "
+        "⚠️ This permanently deletes old "
         "orders and feedback."
     )
 
@@ -2082,40 +1916,50 @@ def data_management():
         use_container_width=True
     ):
 
-        deleted_orders, deleted_feedback = (
-            cleanup_old_data()
-        )
+        (
+            deleted_orders,
+            deleted_feedback
+        ) = cleanup_old_data()
 
         st.success(
-            f"Cleanup completed: "
-            f"{deleted_orders} old orders and "
-            f"{deleted_feedback} old feedback "
-            f"records deleted."
+            f"Cleanup completed. "
+            f"Deleted {deleted_orders} orders "
+            f"and {deleted_feedback} feedback records."
         )
 
         st.rerun()
 
 
 # =========================================================
-# CAFETERIA DASHBOARD
+# CAFETERIA PORTAL
 # =========================================================
 
 def cafeteria_page():
 
-    st.markdown("""
-    <div class="portal-header">
-
+    st.markdown(
+        """
+        <div class="portal-box">
         <div class="portal-title">
-            📋 Cafeteria Portal
+        📋 Cafeteria Portal
         </div>
-
         <div class="portal-subtitle">
-            Manage orders, menu, popular picks,
-            availability and feedback
+        Manage orders, menu, popular picks,
+        availability and feedback
         </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    </div>
-    """, unsafe_allow_html=True)
+    # -----------------------------------------------------
+    # CONTACT
+    # -----------------------------------------------------
+
+    st.info(
+        f"👨‍💼 **Cafeteria Desk:** {DESK_NAME}  |  "
+        f"📞 **{DESK_PHONE}**  |  "
+        f"✉️ **{DESK_EMAIL}**"
+    )
 
     if st.button(
         "← Return to Home"
@@ -2123,9 +1967,9 @@ def cafeteria_page():
 
         go_home()
 
-    # =====================================================
+    # -----------------------------------------------------
     # MENU
-    # =====================================================
+    # -----------------------------------------------------
 
     with st.expander(
         "🍽️ Menu Management"
@@ -2133,9 +1977,9 @@ def cafeteria_page():
 
         menu_management()
 
-    # =====================================================
+    # -----------------------------------------------------
     # DATA MANAGEMENT
-    # =====================================================
+    # -----------------------------------------------------
 
     with st.expander(
         "🧹 Data Management"
@@ -2145,9 +1989,9 @@ def cafeteria_page():
 
     st.divider()
 
-    # =====================================================
+    # -----------------------------------------------------
     # DASHBOARD
-    # =====================================================
+    # -----------------------------------------------------
 
     st.subheader(
         "📊 Today's Dashboard"
@@ -2191,78 +2035,47 @@ def cafeteria_page():
         ]
     )
 
-    metrics = [
+    # IMPORTANT:
+    # Using Streamlit native metrics instead of HTML.
+    # This fixes the <div class="metric..."> problem.
 
-        (
-            "📦",
-            "Total Orders",
+    c1, c2, c3, c4, c5 = st.columns(5)
+
+    with c1:
+        st.metric(
+            "📦 Total Orders",
             total_orders
-        ),
+        )
 
-        (
-            "🔵",
-            "Confirmed",
+    with c2:
+        st.metric(
+            "🔵 Confirmed",
             confirmed
-        ),
+        )
 
-        (
-            "🟠",
-            "Preparing",
+    with c3:
+        st.metric(
+            "🟠 Preparing",
             preparing
-        ),
+        )
 
-        (
-            "🟢",
-            "Ready",
+    with c4:
+        st.metric(
+            "🟢 Ready",
             ready
-        ),
+        )
 
-        (
-            "✅",
-            "Collected",
+    with c5:
+        st.metric(
+            "✅ Collected",
             collected
         )
-    ]
-
-    cols = st.columns(5)
-
-    for col, (
-        icon,
-        label,
-        value
-    ) in zip(
-        cols,
-        metrics
-    ):
-
-        with col:
-
-            st.markdown(
-                f"""
-                <div class="metric-box">
-
-                    <div class="metric-icon">
-                        {icon}
-                    </div>
-
-                    <div class="metric-label">
-                        {label}
-                    </div>
-
-                    <div class="metric-number">
-                        {value}
-                    </div>
-
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
 
     st.divider()
 
-    # =====================================================
-    # SEARCH / FILTER
-    # =====================================================
+    # -----------------------------------------------------
+    # ORDERS
+    # -----------------------------------------------------
 
     st.subheader(
         "📋 Today's Orders"
@@ -2294,14 +2107,11 @@ def cafeteria_page():
 
     if search:
 
-        search_lower = (
-            search.lower()
-        )
+        search_lower = search.lower()
 
         filtered_orders = [
-
-            x for x in filtered_orders
-
+            x
+            for x in filtered_orders
             if (
                 search_lower
                 in str(
@@ -2311,9 +2121,7 @@ def cafeteria_page():
                     )
                 ).lower()
             )
-
             or
-
             (
                 search_lower
                 in str(
@@ -2328,31 +2136,24 @@ def cafeteria_page():
     if status_filter != "All":
 
         filtered_orders = [
-
-            x for x in filtered_orders
-
+            x
+            for x in filtered_orders
             if x.get(
                 "status"
             ) == status_filter
         ]
 
-    # =====================================================
-    # SEPARATE ORDERS
-    # =====================================================
-
     break_orders = [
-
-        x for x in filtered_orders
-
+        x
+        for x in filtered_orders
         if x.get(
             "order_type"
         ) == "Break Order"
     ]
 
     regular_orders = [
-
-        x for x in filtered_orders
-
+        x
+        for x in filtered_orders
         if x.get(
             "order_type"
         ) == "Regular Order"
@@ -2470,26 +2271,27 @@ def feedback_page():
 
         db.collection(
             "feedback"
-        ).add({
+        ).add(
+            {
+                "order_id":
+                    order_id,
 
-            "order_id":
-                order_id,
+                "rating":
+                    rating,
 
-            "rating":
-                rating,
+                "comment":
+                    comment,
 
-            "comment":
-                comment,
+                "image":
+                    image_data,
 
-            "image":
-                image_data,
+                "date":
+                    today,
 
-            "date":
-                today,
-
-            "created_at":
-                firestore.SERVER_TIMESTAMP
-        })
+                "created_at":
+                    firestore.SERVER_TIMESTAMP
+            }
+        )
 
         st.success(
             "Thank you for your feedback! ❤️"
@@ -2562,6 +2364,24 @@ with st.sidebar:
 
         st.session_state.page = "Feedback"
         st.rerun()
+
+    st.divider()
+
+    st.markdown(
+        "### 📞 Desk Contact"
+    )
+
+    st.write(
+        f"👨‍💼 {DESK_NAME}"
+    )
+
+    st.write(
+        f"📞 {DESK_PHONE}"
+    )
+
+    st.write(
+        f"✉️ {DESK_EMAIL}"
+    )
 
     st.divider()
 
