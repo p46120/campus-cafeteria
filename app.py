@@ -2,15 +2,13 @@ import json
 from datetime import datetime
 
 import streamlit as st
-import pandas as pd
-
 import firebase_admin
 from firebase_admin import credentials, firestore
 
 
-# ============================================================
+# =========================================================
 # PAGE CONFIG
-# ============================================================
+# =========================================================
 
 st.set_page_config(
     page_title="Campus Cafeteria",
@@ -19,100 +17,127 @@ st.set_page_config(
 )
 
 
-# ============================================================
+# =========================================================
 # FIREBASE CONNECTION
-# ============================================================
+# =========================================================
 
 @st.cache_resource
 def initialize_firebase():
-    firebase_data = json.loads(st.secrets["firebase_json"])
 
-    if not firebase_admin._apps:
-        cred = credentials.Certificate(firebase_data)
-        firebase_admin.initialize_app(cred)
+    try:
+        firebase_json = json.loads(st.secrets["firebase_json"])
 
-    return firestore.client()
+        if not firebase_admin._apps:
+            cred = credentials.Certificate(firebase_json)
+            firebase_admin.initialize_app(cred)
 
+        return firestore.client(), True
 
-try:
-    db = initialize_firebase()
-    firebase_connected = True
-except Exception as e:
-    db = None
-    firebase_connected = False
-    firebase_error = str(e)
+    except Exception as e:
+        return None, False
 
 
-# ============================================================
+db, firebase_connected = initialize_firebase()
+
+
+# =========================================================
+# MENU
+# =========================================================
+
+MENU = {
+    "Tea": {
+        "price": 15,
+        "status": "Ready"
+    },
+    "Sandwich": {
+        "price": 40,
+        "status": "Prepared"
+    },
+    "Maggi": {
+        "price": 35,
+        "status": "Prepared"
+    },
+    "Cold Coffee": {
+        "price": 30,
+        "status": "Ready"
+    },
+    "Veg Roll": {
+        "price": 45,
+        "status": "Prepared"
+    },
+    "Water Bottle": {
+        "price": 20,
+        "status": "Ready"
+    }
+}
+
+
+# =========================================================
 # SESSION STATE
-# ============================================================
+# =========================================================
 
 if "page" not in st.session_state:
     st.session_state.page = "home"
 
 if "cart" not in st.session_state:
-    st.session_state.cart = []
-
-if "order_confirmed" not in st.session_state:
-    st.session_state.order_confirmed = False
+    st.session_state.cart = {}
 
 if "order_id" not in st.session_state:
     st.session_state.order_id = None
 
-
-# ============================================================
-# SAMPLE MENU
-# ============================================================
-
-MENU = [
-    {
-        "name": "Tea",
-        "price": 15,
-        "type": "Ready"
-    },
-    {
-        "name": "Sandwich",
-        "price": 40,
-        "type": "Prepared"
-    },
-    {
-        "name": "Maggi",
-        "price": 35,
-        "type": "Prepared"
-    },
-    {
-        "name": "Cold Coffee",
-        "price": 30,
-        "type": "Ready"
-    },
-    {
-        "name": "Veg Roll",
-        "price": 45,
-        "type": "Prepared"
-    },
-    {
-        "name": "Water Bottle",
-        "price": 20,
-        "type": "Ready"
-    }
-]
+if "last_order" not in st.session_state:
+    st.session_state.last_order = None
 
 
-# ============================================================
+# =========================================================
+# HELPER FUNCTIONS
+# =========================================================
+
+def add_to_cart(item):
+
+    if item not in st.session_state.cart:
+        st.session_state.cart[item] = 1
+    else:
+        st.session_state.cart[item] += 1
+
+
+def remove_from_cart(item):
+
+    if item in st.session_state.cart:
+
+        st.session_state.cart[item] -= 1
+
+        if st.session_state.cart[item] <= 0:
+            del st.session_state.cart[item]
+
+
+def cart_total():
+
+    total = 0
+
+    for item, quantity in st.session_state.cart.items():
+        total += MENU[item]["price"] * quantity
+
+    return total
+
+
+def clear_cart():
+
+    st.session_state.cart = {}
+
+
+# =========================================================
 # HOME PAGE
-# ============================================================
+# =========================================================
 
-if st.session_state.page == "home":
+def home_page():
 
     st.title("🍽️ Campus Cafeteria")
-    st.subheader("Pre-Order & Queue Management System")
 
-    st.divider()
+    st.subheader("Skip the queue. Order before you reach the cafeteria.")
 
-    st.header("👋 Welcome")
     st.write(
-        "Order your food before reaching the cafeteria, "
-        "avoid unnecessary waiting and collect your order easily."
+        "Choose your portal below."
     )
 
     st.divider()
@@ -120,40 +145,43 @@ if st.session_state.page == "home":
     col1, col2 = st.columns(2)
 
     with col1:
-        st.header("👨‍🎓 Student Portal")
+
+        st.markdown("### 🎓 Student Portal")
+
         st.write(
-            "View today's menu, place an order and receive your Order ID."
+            "Browse the menu, place your order and collect it using your Order ID."
         )
 
         if st.button(
-            "🍽️ Order Food",
-            type="primary",
+            "Order Food →",
             use_container_width=True
         ):
             st.session_state.page = "student"
             st.rerun()
 
     with col2:
-        st.header("👨‍🍳 Cafeteria Portal")
+
+        st.markdown("### 👨‍🍳 Cafeteria Portal")
+
         st.write(
-            "Cafeteria staff can manage orders and the menu."
+            "View today's orders and manage order collection."
         )
 
         if st.button(
-            "👨‍🍳 Cafeteria Dashboard",
+            "Cafeteria Dashboard →",
             use_container_width=True
         ):
             st.session_state.page = "cafeteria"
             st.rerun()
 
 
-# ============================================================
-# STUDENT PORTAL
-# ============================================================
+# =========================================================
+# STUDENT PAGE
+# =========================================================
 
-elif st.session_state.page == "student":
+def student_page():
 
-    st.title("🍽️ Student Ordering")
+    st.title("🎓 Student Ordering")
 
     if st.button("← Back to Home"):
         st.session_state.page = "home"
@@ -161,20 +189,34 @@ elif st.session_state.page == "student":
 
     st.divider()
 
-    # Student details
-    st.subheader("Student Details")
+    # -----------------------------------------------------
+    # STUDENT DETAILS
+    # -----------------------------------------------------
 
-    student_name = st.text_input(
-        "Student Name"
-    )
+    st.subheader("1. Student Details")
 
-    student_id = st.text_input(
-        "Student ID"
-    )
+    col1, col2 = st.columns(2)
 
-    # Order type
+    with col1:
+        student_name = st.text_input(
+            "Student Name",
+            placeholder="Enter your name"
+        )
+
+    with col2:
+        student_id = st.text_input(
+            "Student ID",
+            placeholder="Enter your student ID"
+        )
+
+    # -----------------------------------------------------
+    # ORDER TYPE
+    # -----------------------------------------------------
+
+    st.subheader("2. Order Type")
+
     order_type = st.radio(
-        "Order Type",
+        "Choose how you want to order",
         [
             "Break Order",
             "Regular Order"
@@ -182,7 +224,6 @@ elif st.session_state.page == "student":
         horizontal=True
     )
 
-    # Break selection
     break_time = None
 
     if order_type == "Break Order":
@@ -196,125 +237,168 @@ elif st.session_state.page == "student":
         )
 
         st.info(
-            "Your order will be prepared for the selected break. "
-            "Once confirmed, simply collect it using your Order ID."
+            "💡 Break orders are prepared in advance. "
+            "Once confirmed, simply collect them during your selected break."
         )
 
     else:
 
         st.info(
-            "Regular orders can be placed whenever the cafeteria is open."
+            "💡 Regular orders follow the full preparation workflow."
         )
 
+    # -----------------------------------------------------
+    # MENU
+    # -----------------------------------------------------
+
+    st.subheader("3. Menu")
+
+    menu_items = list(MENU.keys())
+
+    for i in range(0, len(menu_items), 3):
+
+        cols = st.columns(3)
+
+        for j, col in enumerate(cols):
+
+            if i + j >= len(menu_items):
+                continue
+
+            item = menu_items[i + j]
+
+            with col:
+
+                st.markdown(
+                    f"""
+                    ### {item}
+
+                    **₹{MENU[item]["price"]}**
+
+                    Preparation: {MENU[item]["status"]}
+                    """
+                )
+
+                if item in st.session_state.cart:
+
+                    quantity = st.session_state.cart[item]
+
+                    c1, c2, c3 = st.columns(3)
+
+                    with c1:
+                        if st.button(
+                            "−",
+                            key=f"minus_{item}",
+                            use_container_width=True
+                        ):
+                            remove_from_cart(item)
+                            st.rerun()
+
+                    with c2:
+                        st.markdown(
+                            f"<h3 style='text-align:center'>{quantity}</h3>",
+                            unsafe_allow_html=True
+                        )
+
+                    with c3:
+                        if st.button(
+                            "+",
+                            key=f"plus_{item}",
+                            use_container_width=True
+                        ):
+                            add_to_cart(item)
+                            st.rerun()
+
+                else:
+
+                    if st.button(
+                        "Add to Cart",
+                        key=f"add_{item}",
+                        use_container_width=True
+                    ):
+                        add_to_cart(item)
+                        st.rerun()
+
+    # -----------------------------------------------------
+    # CART
+    # -----------------------------------------------------
+
     st.divider()
 
-    # Menu
-    st.subheader("Today's Menu")
-
-    for item in MENU:
-
-        col1, col2, col3 = st.columns([3, 1, 1])
-
-        with col1:
-            st.write(f"**{item['name']}**")
-
-            if item["type"] == "Ready":
-                st.caption("Ready item")
-            else:
-                st.caption("Prepared item")
-
-        with col2:
-            st.write(f"₹{item['price']}")
-
-        with col3:
-
-            if st.button(
-                "Add",
-                key=f"add_{item['name']}"
-            ):
-
-                st.session_state.cart.append(item)
-                st.success(f"{item['name']} added")
-
-    st.divider()
-
-    # Cart
     st.subheader("🛒 Your Cart")
 
-    if len(st.session_state.cart) == 0:
+    if not st.session_state.cart:
 
-        st.info("Your cart is empty.")
+        st.info("Your cart is empty. Add something from the menu.")
 
     else:
 
-        total = 0
+        for item, quantity in st.session_state.cart.items():
 
-        for item in st.session_state.cart:
+            item_total = MENU[item]["price"] * quantity
 
-            st.write(
-                f"- {item['name']} — ₹{item['price']}"
-            )
+            col1, col2, col3 = st.columns([4, 2, 2])
 
-            total += item["price"]
+            with col1:
+                st.write(f"**{item}**")
 
-        st.markdown(f"### Total: ₹{total}")
+            with col2:
+                st.write(f"× {quantity}")
 
-        if st.button(
-            "Clear Cart"
-        ):
-            st.session_state.cart = []
-            st.rerun()
+            with col3:
+                st.write(f"₹{item_total}")
 
         st.divider()
 
+        total = cart_total()
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("### Total")
+
+        with col2:
+            st.markdown(f"### ₹{total}")
+
         if st.button(
-            "✅ Confirm Order",
+            "🗑️ Clear Cart",
+            use_container_width=True
+        ):
+            clear_cart()
+            st.rerun()
+
+    # -----------------------------------------------------
+    # PLACE ORDER
+    # -----------------------------------------------------
+
+    st.divider()
+
+    if st.session_state.cart:
+
+        if st.button(
+            "🍽️ Place Order",
             type="primary",
             use_container_width=True
         ):
 
-            if not student_name or not student_id:
+            if not student_name.strip():
 
-                st.error(
-                    "Please enter your Student Name and Student ID."
-                )
+                st.error("Please enter your name.")
+
+            elif not student_id.strip():
+
+                st.error("Please enter your Student ID.")
 
             else:
 
                 # Temporary Order ID
-                temporary_order_id = datetime.now().strftime(
-                    "%H%M%S"
-                )
+                # We will replace this with a proper daily
+                # sequential Firestore counter later.
 
-                st.session_state.order_id = temporary_order_id
+                order_id = datetime.now().strftime("%H%M%S")
 
-                # Regular ready items can directly become Ready
-                if order_type == "Regular Order":
-
-                    all_ready = all(
-                        item["type"] == "Ready"
-                        for item in st.session_state.cart
-                    )
-
-                    initial_status = (
-                        "Ready"
-                        if all_ready
-                        else "Confirmed"
-                    )
-
-                else:
-
-                    # Break orders only use Confirmed
-                    initial_status = "Confirmed"
-
-                # Create order data
                 order_data = {
 
-                    "order_id": temporary_order_id,
-
-                    "date": datetime.now().strftime(
-                        "%Y-%m-%d"
-                    ),
+                    "order_id": order_id,
 
                     "student_name": student_name,
 
@@ -324,32 +408,40 @@ elif st.session_state.page == "student":
 
                     "break_time": break_time,
 
-                    "items": [
-                        {
-                            "name": item["name"],
-                            "price": item["price"]
-                        }
-                        for item in st.session_state.cart
-                    ],
+                    "items": dict(st.session_state.cart),
 
-                    "amount": total,
+                    "total": cart_total(),
 
-                    "status": initial_status,
+                    "status": (
+                        "Confirmed"
+                        if order_type == "Break Order"
+                        else "Ready"
+                        if all(
+                            MENU[item]["status"] == "Ready"
+                            for item in st.session_state.cart
+                        )
+                        else "Confirmed"
+                    ),
 
-                    "created_at": firestore.SERVER_TIMESTAMP
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+
+                    "created_at": datetime.now()
                 }
 
-                # Save order to Firestore
+                # Save to Firestore
+
                 try:
 
-                    db.collection("orders").add(order_data)
+                    if db is not None:
 
-                    st.session_state.order_confirmed = True
+                        db.collection("orders").add(order_data)
 
-                    # IMPORTANT:
-                    # Move to confirmation page
-                    # so the student doesn't remain
-                    # on the ordering page.
+                    st.session_state.order_id = order_id
+
+                    st.session_state.last_order = order_data
+
+                    clear_cart()
+
                     st.session_state.page = "confirmation"
 
                     st.rerun()
@@ -357,68 +449,91 @@ elif st.session_state.page == "student":
                 except Exception as e:
 
                     st.error(
-                        "Could not place the order."
-                    )
-
-                    st.error(
-                        f"Firebase error: {e}"
+                        f"Could not place order: {e}"
                     )
 
 
-# ============================================================
-# ORDER CONFIRMATION
-# ============================================================
+# =========================================================
+# CONFIRMATION PAGE
+# =========================================================
 
-elif st.session_state.page == "confirmation":
+def confirmation_page():
 
-    st.title("🎉 Order Confirmed!")
+    order = st.session_state.last_order
 
-    st.success(
-        "Your order has been successfully placed."
-    )
+    st.title("✅ Order Confirmed!")
 
-    st.divider()
+    if order:
 
-    st.metric(
-        "Your Order ID",
-        st.session_state.order_id
-    )
+        st.success(
+            f"Your Order ID is **#{order['order_id']}**"
+        )
 
-    st.info(
-        "Please remember your Order ID and show it at "
-        "the cafeteria when collecting your food."
-    )
+        st.markdown(
+            "### Show this Order ID at the cafeteria counter."
+        )
+
+        st.divider()
+
+        st.subheader("Order Details")
+
+        st.write(
+            f"**Student:** {order['student_name']}"
+        )
+
+        st.write(
+            f"**Order Type:** {order['order_type']}"
+        )
+
+        if order["break_time"]:
+            st.write(
+                f"**Break:** {order['break_time']}"
+            )
+
+        st.divider()
+
+        st.subheader("Items")
+
+        for item, quantity in order["items"].items():
+
+            price = MENU[item]["price"] * quantity
+
+            st.write(
+                f"{item} × {quantity} — ₹{price}"
+            )
+
+        st.divider()
+
+        st.markdown(
+            f"## Total: ₹{order['total']}"
+        )
+
+        st.info(
+            f"📌 Your Order ID: **#{order['order_id']}**"
+        )
 
     if st.button(
-        "🍽️ Place Another Order",
+        "Place Another Order",
         use_container_width=True
     ):
 
-        st.session_state.cart = []
-        st.session_state.order_confirmed = False
-        st.session_state.order_id = None
         st.session_state.page = "student"
-
         st.rerun()
 
     if st.button(
-        "← Back to Home",
+        "Back to Home",
         use_container_width=True
     ):
 
-        st.session_state.cart = []
-        st.session_state.order_confirmed = False
-        st.session_state.order_id = None
         st.session_state.page = "home"
-
         st.rerun()
 
 
-# ============================================================
-# CAFETERIA PORTAL
-# ============================================================
+# =========================================================
+# CAFETERIA DASHBOARD
+# =========================================================
 
-elif st.session_state.page == "cafeteria":
+def cafeteria_page():
 
     st.title("👨‍🍳 Cafeteria Dashboard")
 
@@ -428,7 +543,6 @@ elif st.session_state.page == "cafeteria":
 
     st.divider()
 
-    # Firebase connection status
     if firebase_connected:
 
         st.success(
@@ -441,79 +555,71 @@ elif st.session_state.page == "cafeteria":
             "🔴 Firebase connection failed"
         )
 
-        st.code(
-            firebase_error
-        )
-
     st.subheader("Today's Orders")
 
-    # Get orders from Firestore
     try:
 
-        orders_ref = db.collection("orders")
+        orders_ref = db.collection("orders").stream()
 
-        orders = orders_ref.stream()
+        orders = []
 
-        order_list = []
+        today = datetime.now().strftime("%Y-%m-%d")
 
-        for doc in orders:
+        for doc in orders_ref:
 
-            order = doc.to_dict()
+            data = doc.to_dict()
 
-            order_list.append({
+            if data.get("date") == today:
 
-                "Order ID": order.get(
-                    "order_id",
-                    ""
-                ),
+                orders.append(data)
 
-                "Student": order.get(
-                    "student_name",
-                    ""
-                ),
+        if not orders:
 
-                "Student ID": order.get(
-                    "student_id",
-                    ""
-                ),
-
-                "Order Type": order.get(
-                    "order_type",
-                    ""
-                ),
-
-                "Amount": order.get(
-                    "amount",
-                    0
-                ),
-
-                "Status": order.get(
-                    "status",
-                    ""
-                )
-
-            })
-
-        if order_list:
-
-            df = pd.DataFrame(
-                order_list
-            )
-
-            st.dataframe(
-                df,
-                use_container_width=True,
-                hide_index=True
-            )
+            st.info("No orders yet today.")
 
         else:
 
-            st.info(
-                "No orders have been placed yet."
-            )
+            for order in orders:
+
+                st.markdown(
+                    f"""
+                    ### #{order.get("order_id")}
+
+                    **Student:** {order.get("student_name")}
+
+                    **Items:** {order.get("items")}
+
+                    **Total:** ₹{order.get("total")}
+
+                    **Status:** {order.get("status")}
+                    """
+                )
+
+                st.divider()
 
     except Exception as e:
 
         st.error(
             f"Could not load orders: {e}"
         )
+
+
+# =========================================================
+# PAGE ROUTING
+# =========================================================
+
+if st.session_state.page == "home":
+
+    home_page()
+
+elif st.session_state.page == "student":
+
+    student_page()
+
+elif st.session_state.page == "confirmation":
+
+    confirmation_page()
+
+elif st.session_state.page == "cafeteria":
+
+    cafeteria_page()
