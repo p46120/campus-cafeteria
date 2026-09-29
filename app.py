@@ -65,8 +65,29 @@ LEGACY_MENU_NAME_MAP = {
 st.markdown(
     """
 <style>
-.stApp { background: #f7f8fc; }
-.block-container { padding-top: 1.2rem; padding-bottom: 3rem; }
+.stApp { background: linear-gradient(180deg,#f8fafc 0%,#f7f8fc 55%,#ffffff 100%); }
+.block-container { padding-top: .65rem; padding-bottom: 3rem; max-width: 1400px; }
+.app-brand {
+    display:flex; align-items:center; gap:.55rem;
+    padding:.65rem .9rem; margin-bottom:.7rem;
+    border-radius:18px;
+    background:linear-gradient(135deg,#ffffff 0%,#f8fafc 60%,#eef6ff 100%);
+    border:1px solid #e2e8f0;
+    box-shadow:0 5px 18px rgba(15,23,42,.045);
+}
+.app-brand-icon { font-size:1.7rem; }
+.app-brand-name { font-size:1.35rem; font-weight:800; color:#1f2937; }
+div[data-testid="stHorizontalBlock"] button {
+    border-radius:13px;
+    border:1px solid #dbe2ea;
+    background:#ffffff;
+    transition:all .15s ease;
+}
+div[data-testid="stHorizontalBlock"] button:hover {
+    border-color:#93c5fd;
+    box-shadow:0 4px 12px rgba(59,130,246,.10);
+}
+
 .hero {
     padding: 2rem;
     border-radius: 24px;
@@ -379,6 +400,17 @@ def image_to_base64(uploaded_file, max_bytes=500_000):
     if len(raw) > max_bytes:
         raise ValueError("Image is too large. Please upload an image below 500 KB.")
     return base64.b64encode(raw).decode("utf-8")
+
+
+def decode_menu_image(item):
+    """Decode the existing stored menu photo without changing how images are stored."""
+    encoded = item.get("photo_base64") if isinstance(item, dict) else None
+    if not encoded:
+        return None
+    try:
+        return base64.b64decode(encoded)
+    except Exception:
+        return None
 
 
 # ============================================================
@@ -1005,7 +1037,15 @@ def render_nav():
     student = current_student()
     cafeteria = st.session_state.get("cafeteria_logged_in", False)
 
-    st.markdown("### 🍽️ Campus Cafeteria")
+    st.markdown(
+        """
+<div class="app-brand">
+    <div class="app-brand-icon">🍽️</div>
+    <div class="app-brand-name">Campus Cafeteria</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
 
     if student:
         labels = [
@@ -1167,15 +1207,29 @@ def order_food_page():
         cols = st.columns(min(3, len(popular)))
         for col, item in zip(cols, popular[:3]):
             with col:
-                st.markdown(
-                    f"""
-<div class="card">
-<div class="card-title">{item['name']}</div>
-<div class="card-text">₹{effective_price(item):.0f}</div>
-</div>
-""",
-                    unsafe_allow_html=True,
-                )
+                with st.container(border=True):
+                    image_bytes = decode_menu_image(item)
+                    if image_bytes:
+                        st.image(image_bytes, width=180)
+                    else:
+                        st.markdown("<div style='font-size:3rem;text-align:center;padding:.4rem 0;'>🍽️</div>", unsafe_allow_html=True)
+
+                    st.markdown(
+                        f"<div class=\"card-title\">{item['name']}</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                    discount = float(item.get("discount", 0))
+                    if discount > 0:
+                        st.markdown(
+                            f"<div class=\"card-text\"><s>₹{float(item.get('price', 0)):.0f}</s> &nbsp; <b>₹{effective_price(item):.0f}</b></div>",
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.markdown(
+                            f"<div class=\"card-text\"><b>₹{effective_price(item):.0f}</b></div>",
+                            unsafe_allow_html=True,
+                        )
 
     st.markdown("### Menu")
 
@@ -2112,8 +2166,6 @@ if not firebase_connected:
     st.error("🔴 Firebase connection failed.")
     st.code(firebase_error)
     st.stop()
-
-st.success("🟢 Firebase connected successfully", icon="🟢")
 
 render_nav()
 
