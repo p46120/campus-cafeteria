@@ -1,3 +1,4 @@
+
 import base64
 import json
 import uuid
@@ -451,8 +452,14 @@ def image_to_base64(uploaded_file, max_bytes=220_000):
         raise ValueError("Could not compress the image enough. Please choose a smaller photo.")
     except ValueError:
         raise
+    except ImportError as exc:
+        raise ValueError(
+            "Image support is not installed. Add Pillow to requirements.txt and redeploy the app."
+        ) from exc
     except Exception as exc:
-        raise ValueError("Please upload a valid JPG, JPEG, PNG, or WEBP image.") from exc
+        raise ValueError(
+            "Could not process this image. Please use a JPG, JPEG, PNG, or WEBP photo."
+        ) from exc
 
 
 def decode_menu_image(item):
