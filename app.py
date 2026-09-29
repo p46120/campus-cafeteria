@@ -66,7 +66,7 @@ st.markdown(
     """
 <style>
 .stApp { background: linear-gradient(180deg,#f8fafc 0%,#f7f8fc 55%,#ffffff 100%); }
-.block-container { padding-top: .65rem; padding-bottom: 3rem; max-width: 1400px; }
+.block-container { padding-top: 2.4rem; padding-bottom: 3rem; max-width: 1400px; }
 .app-brand {
     display:flex; align-items:center; gap:.55rem;
     padding:.65rem .9rem; margin-bottom:.7rem;
@@ -365,7 +365,15 @@ def effective_price(item):
     return max(0, round(price * (1 - discount / 100), 2))
 
 
-def save_menu_item(name, price, discount, available, popular, old_doc_id=None):
+def save_menu_item(
+    name,
+    price,
+    discount,
+    available,
+    popular,
+    old_doc_id=None,
+    photo_base64=None,
+):
     name = name.strip()
     target_id = old_doc_id or name
 
@@ -377,9 +385,24 @@ def save_menu_item(name, price, discount, available, popular, old_doc_id=None):
         "popular": bool(popular),
     }
 
+    # Keep an existing photo when the user edits an item without uploading a
+    # replacement.  When a new photo is supplied, it replaces the old one.
+    if photo_base64:
+        payload["photo_base64"] = photo_base64
+    elif old_doc_id:
+        old_snapshot = db.collection("menu").document(old_doc_id).get()
+        if old_snapshot.exists:
+            old_data = old_snapshot.to_dict() or {}
+            if old_data.get("photo_base64"):
+                payload["photo_base64"] = old_data["photo_base64"]
+            else:
+                for legacy_field in ("image_base64", "image_data", "photo"):
+                    if old_data.get(legacy_field):
+                        payload["photo_base64"] = old_data[legacy_field]
+                        break
+
     db.collection("menu").document(target_id).set(payload, merge=True)
 
-    # If renaming a legacy document, keep only the renamed record.
     if old_doc_id and old_doc_id != name:
         db.collection("menu").document(old_doc_id).delete()
 
@@ -393,24 +416,62 @@ def delete_menu_item(item):
 # IMAGE HELPERS
 # ============================================================
 
-def image_to_base64(uploaded_file, max_bytes=500_000):
+def image_to_base64(uploaded_file, max_bytes=220_000):
+    """Convert a phone/computer image into a small Firestore-safe JPEG."""
     if uploaded_file is None:
         return None
-    raw = uploaded_file.getvalue()
-    if len(raw) > max_bytes:
-        raise ValueError("Image is too large. Please upload an image below 500 KB.")
-    return base64.b64encode(raw).decode("utf-8")
+
+    try:
+        from io import BytesIO
+        from PIL import Image
+
+        raw = uploaded_file.getvalue()
+        if not raw:
+            raise ValueError("The selected image is empty.")
+
+        image = Image.open(BytesIO(raw)).convert("RGB")
+        image.thumbnail((1000, 800))
+
+        # Compress automatically so normal phone photos work without the
+        # student/cafeteria user needing to resize them first.
+        quality = 85
+        while quality >= 45:
+            buffer = BytesIO()
+            image.save(
+                buffer,
+                format="JPEG",
+                quality=quality,
+                optimize=True,
+            )
+            encoded_bytes = buffer.getvalue()
+            if len(encoded_bytes) <= max_bytes:
+                return base64.b64encode(encoded_bytes).decode("utf-8")
+            quality -= 5
+
+        raise ValueError("Could not compress the image enough. Please choose a smaller photo.")
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError("Please upload a valid JPG, JPEG, PNG, or WEBP image.") from exc
 
 
 def decode_menu_image(item):
-    """Decode the existing stored menu photo without changing how images are stored."""
-    encoded = item.get("photo_base64") if isinstance(item, dict) else None
-    if not encoded:
+    """Read menu photos from the current field and older prototype fields."""
+    if not isinstance(item, dict):
         return None
-    try:
-        return base64.b64decode(encoded)
-    except Exception:
-        return None
+
+    for field in ("photo_base64", "image_base64", "image_data", "photo"):
+        encoded = item.get(field)
+        if not encoded:
+            continue
+        try:
+            if isinstance(encoded, bytes):
+                return encoded
+            return base64.b64decode(encoded)
+        except Exception:
+            continue
+
+    return None
 
 
 # ============================================================
@@ -2000,7 +2061,10 @@ def menu_management_page():
             "Food Photo (optional)",
             type=["png", "jpg", "jpeg", "webp"],
             key="new_food_photo",
+            help="Choose a food photo from your phone gallery or computer.",
         )
+        if photo is not None:
+            st.image(photo, width=180, caption="Selected photo")
         save_new = st.form_submit_button("Save Item", type="primary")
 
     if save_new:
@@ -2017,12 +2081,8 @@ def menu_management_page():
                     discount,
                     available,
                     popular,
+                    photo_base64=photo_b64,
                 )
-                if photo_b64:
-                    db.collection("menu").document(name.strip()).set(
-                        {"photo_base64": photo_b64},
-                        merge=True,
-                    )
                 st.success("Menu item saved.")
                 st.rerun()
             except ValueError as exc:
@@ -2084,7 +2144,14 @@ def menu_management_page():
                         "Replace photo (optional)",
                         type=["png", "jpg", "jpeg", "webp"],
                         key=f"edit_photo_{doc_id}",
+                        help="Choose a replacement food photo from your phone gallery or computer.",
                     )
+                    if edit_photo is not None:
+                        st.image(edit_photo, width=180, caption="New photo selected")
+                    else:
+                        existing_photo = decode_menu_image(item)
+                        if existing_photo:
+                            st.image(existing_photo, width=180, caption="Current photo")
                     save_edit = st.form_submit_button("Save Changes")
 
                 if save_edit:
@@ -2102,12 +2169,8 @@ def menu_management_page():
                                 edit_available,
                                 edit_popular,
                                 old_doc_id=doc_id,
+                                photo_base64=photo_b64,
                             )
-                            if photo_b64:
-                                db.collection("menu").document(edit_name.strip()).set(
-                                    {"photo_base64": photo_b64},
-                                    merge=True,
-                                )
                             st.success("Item updated.")
                             st.rerun()
                         except ValueError as exc:
